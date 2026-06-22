@@ -89,7 +89,8 @@ body>*{position:relative;z-index:1}
 /* ============================================================
    登录页
    ============================================================ */
-.page-login{display:flex;align-items:center;justify-content:center;min-height:100vh;
+.page-login{display:flex;align-items:flex-start;justify-content:center;min-height:100vh;
+  padding-top:8vh;
   background:transparent}
 .page-login::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
   background:linear-gradient(180deg,transparent 0%,rgba(0,212,255,.02) 50%,transparent 100%);
@@ -425,11 +426,15 @@ body>*{position:relative;z-index:1}
 .loading{text-align:center;padding:40px;color:var(--text-dim);font-size:13px;letter-spacing:1px}
 
 /* ---- 悬停预览浮层 ---- */
-.hover-tip{position:fixed;z-index:2000;max-width:500px;max-height:420px;overflow-y:auto;
+.hover-tip{position:fixed;z-index:2000;max-width:520px;max-height:60vh;overflow-y:auto;
   background:linear-gradient(170deg,var(--bg-panel),var(--bg-dark));
   border:1px solid var(--border-hover);border-radius:6px;padding:16px 20px;
   box-shadow:0 0 40px rgba(0,212,255,.12),0 12px 40px rgba(0,0,0,.5);
-  display:none;font-size:12px;line-height:1.7}
+  display:none;font-size:12px;line-height:1.7;
+  scrollbar-width:thin;scrollbar-color:var(--border-hover) transparent}
+.hover-tip::-webkit-scrollbar{width:5px}
+.hover-tip::-webkit-scrollbar-track{background:transparent}
+.hover-tip::-webkit-scrollbar-thumb{background:var(--border-hover);border-radius:3px}
 .hover-tip.show{display:block;animation:fadeIn .15s}
 .hover-tip::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
   background:linear-gradient(90deg,transparent,var(--cyan),var(--blue),var(--cyan),transparent)}
@@ -538,7 +543,7 @@ body>*{position:relative;z-index:1}
 <!-- 战役→战区选择页 -->
 <div class="page page-battle-zones" id="pageBattleZones">
   <div class="sub-header">
-    <button class="back-btn" onclick="goMain()">&#8592; 返回主页</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
     <div class="sub-title" id="bzTitle"></div>
     <div class="sub-info" id="bzInfo"></div>
   </div>
@@ -548,7 +553,7 @@ body>*{position:relative;z-index:1}
 <!-- 战区→战役选择页 -->
 <div class="page page-zone-battles" id="pageZoneBattles">
   <div class="sub-header">
-    <button class="back-btn" onclick="goMain()">&#8592; 返回主页</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
     <div class="sub-title" id="zbTitle"></div>
     <div class="sub-info" id="zbInfo"></div>
   </div>
@@ -558,7 +563,7 @@ body>*{position:relative;z-index:1}
 <!-- 数据详情页（战役+战区交叉） -->
 <div class="page page-detail" id="pageDetail">
   <div class="sub-header">
-    <button class="back-btn" onclick="goMain()">&#8592; 主页</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
     <div class="breadcrumb" id="detailBreadcrumb"></div>
     <div class="sub-info" id="detailInfo"></div>
   </div>
@@ -568,7 +573,7 @@ body>*{position:relative;z-index:1}
 <!-- 路径→场景列表页 -->
 <div class="page page-path" id="pagePath">
   <div class="sub-header">
-    <button class="back-btn" onclick="goMain()">&#8592; 主页</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
     <div class="breadcrumb" id="pathBreadcrumb"></div>
     <div class="sub-info" id="pathInfo"></div>
   </div>
@@ -578,7 +583,7 @@ body>*{position:relative;z-index:1}
 <!-- 场景详情页（10个单元模块） -->
 <div class="page page-scene" id="pageScene">
   <div class="sub-header">
-    <button class="back-btn" onclick="goMain()">&#8592; 主页</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
     <div class="breadcrumb" id="sceneBreadcrumb"></div>
     <div class="sub-info" id="sceneInfo"></div>
   </div>
@@ -588,7 +593,7 @@ body>*{position:relative;z-index:1}
 <!-- 单元信息展示页 -->
 <div class="page page-unit" id="pageUnit">
   <div class="sub-header">
-    <button class="back-btn" onclick="goMain()">&#8592; 主页</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
     <div class="breadcrumb" id="unitBreadcrumb"></div>
     <div class="sub-info" id="unitInfo"></div>
   </div>
@@ -634,7 +639,19 @@ function showPage(name){
   if(el) el.style.display=(name==='login')?'flex':'block';
   window.scrollTo(0,0);
 }
-function goMain(){showPage('main');}
+
+/* 页面历史栈，用于返回上一级 */
+let PAGE_HISTORY=[];
+function navigate(name){
+  PAGE_HISTORY.push(name);
+  showPage(name);
+}
+function goBack(){
+  PAGE_HISTORY.pop(); /* 弹出当前页 */
+  const prev=PAGE_HISTORY[PAGE_HISTORY.length-1]||'main';
+  showPage(prev);
+}
+function goMain(){PAGE_HISTORY=[];showPage('main');}
 function openAdmin(){location.href='/admin?token='+encodeURIComponent(TOKEN);}
 
 async function doLogin(){
@@ -643,13 +660,13 @@ async function doLogin(){
   try{
     const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role_id:rid,password:pwd})});
     if(!res.ok){const d=await res.json();showErr(d.detail||'登录失败');return;}
-    const data=await res.json();TOKEN=data.token;ROLE=data.role;showPage('main');loadMainPage();
+    const data=await res.json();TOKEN=data.token;ROLE=data.role;PAGE_HISTORY=['main'];showPage('main');loadMainPage();
   }catch(e){showErr('网络错误');}
 }
 function showErr(m){document.getElementById('loginErr').textContent=m;}
 async function doLogout(){
   try{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN})});}catch(e){}
-  TOKEN='';ROLE=null;document.getElementById('txtPwd').value='';document.getElementById('loginErr').textContent='';showPage('login');
+  TOKEN='';ROLE=null;PAGE_HISTORY=[];document.getElementById('txtPwd').value='';document.getElementById('loginErr').textContent='';showPage('login');
 }
 
 /* ====== 主页 ====== */
@@ -711,7 +728,7 @@ function renderTroopOverview(zones){
 
 /* ====== 战役→战区选择 ====== */
 async function openBattleZones(bid){
-  showPage('battle-zones');
+  navigate('battle-zones');
   document.getElementById('bzTitle').textContent='加载中...';
   document.getElementById('bzInfo').textContent='';
   document.getElementById('bzBody').innerHTML='<div class="loading">加载中...</div>';
@@ -735,7 +752,7 @@ async function openBattleZones(bid){
 
 /* ====== 战区→战役选择 ====== */
 async function openZoneBattles(zid){
-  showPage('zone-battles');
+  navigate('zone-battles');
   document.getElementById('zbTitle').textContent='加载中...';
   document.getElementById('zbInfo').textContent='';
   document.getElementById('zbBody').innerHTML='<div class="loading">加载中...</div>';
@@ -760,7 +777,7 @@ async function openZoneBattles(zid){
 
 /* ====== 数据详情页（战役+战区交叉） ====== */
 async function openDetail(bid,zid){
-  showPage('detail');
+  navigate('detail');
   document.getElementById('detailBreadcrumb').innerHTML='<span class="loading">加载中...</span>';
   document.getElementById('detailInfo').textContent='';
   document.getElementById('detailBody').innerHTML='<div class="loading">加载中...</div>';
@@ -826,7 +843,7 @@ function renderDetailPage(data){
 let SCENE_CACHE={}; /* key: bid|zid|pid → {path,battle,zone,scenes} */
 
 async function openPath(bid,zid,pid){
-  showPage('path');
+  navigate('path');
   document.getElementById('pathBreadcrumb').innerHTML='<span class="loading">加载中...</span>';
   document.getElementById('pathInfo').textContent='';
   document.getElementById('pathBody').innerHTML='<div class="loading">加载中...</div>';
@@ -908,7 +925,7 @@ const UNIT_FIELDS=[
 function openScene(ck,idx){
   const data=SCENE_CACHE[ck];
   if(!data||!data.scenes||!data.scenes[idx])return;
-  showPage('scene');
+  navigate('scene');
   const s=data.scenes[idx];
   const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名场景';
   /* 面包屑 */
@@ -964,7 +981,7 @@ function openUnit(ck,sceneIdx,unitIdx){
   if(!fieldDef)return;
   const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名场景';
   const v=(s[fieldDef[1]]||'').trim();
-  showPage('unit');
+  navigate('unit');
   document.getElementById('unitBreadcrumb').innerHTML=`
     <span class="crumb" onclick="openBattleZones('${data.battle.id}')">${esc(data.battle.name)}</span>
     <span class="sep">&#10095;</span>
@@ -1014,12 +1031,19 @@ function renderUnitDetail(data,s,sceneTitle,fieldDef,v){
   el.innerHTML=h;
 }
 
-/* ====== 悬停预览组件 ====== */
+/* ====== 悬停预览组件（延迟隐藏+浮层可交互可滚动）====== */
 function firstLine(s){return (s||'').trim().split('\n').filter(l=>l.trim())[0]?.trim()||'';}
 
+let HOVER_TIMER=null;
 function showHoverTip(e,innerHtml){
+  clearTimeout(HOVER_TIMER);
   let tip=document.getElementById('hoverTip');
-  if(!tip){tip=document.createElement('div');tip.id='hoverTip';tip.className='hover-tip';document.body.appendChild(tip);}
+  if(!tip){
+    tip=document.createElement('div');tip.id='hoverTip';tip.className='hover-tip';document.body.appendChild(tip);
+    /* 浮层自身可悬停——鼠标移到浮层上时取消隐藏 */
+    tip.addEventListener('mouseenter',()=>clearTimeout(HOVER_TIMER));
+    tip.addEventListener('mouseleave',()=>{HOVER_TIMER=setTimeout(hideHoverPreview,200);});
+  }
   tip.innerHTML=innerHtml;tip.classList.add('show');
   const rect=e.currentTarget.getBoundingClientRect();
   const tw=tip.offsetWidth,th=tip.offsetHeight;
@@ -1029,7 +1053,11 @@ function showHoverTip(e,innerHtml){
   if(top+th>window.innerHeight-10)top=Math.max(10,rect.top-th-8);
   tip.style.left=left+'px';tip.style.top=top+'px';
 }
-function hideHoverPreview(){const tip=document.getElementById('hoverTip');if(tip)tip.classList.remove('show');}
+function hideHoverPreview(){
+  HOVER_TIMER=setTimeout(()=>{
+    const tip=document.getElementById('hoverTip');if(tip)tip.classList.remove('show');
+  },200);
+}
 
 /* 路径卡片悬停：异步加载并预览该路径的所有场景 */
 async function hoverPathScenes(e,ck,pname){
