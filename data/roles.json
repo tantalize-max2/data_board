@@ -1,0 +1,137 @@
+[
+  {
+    "id": "总经理",
+    "name": "总经理",
+    "zone": "all",
+    "zone_name": "全部战区",
+    "color": "#8B1A1A",
+    "password_hash": "91547b9a751fc8c06d3a93092b00c18b0b974a9c528f6bd8be35abe4fafeeede",
+    "password_salt": "d74cc632454ffa46"
+  },
+  {
+    "id": "分局长（公）",
+    "name": "分局长（公）",
+    "zone": "public",
+    "zone_name": "公众战区",
+    "color": "#1565c0",
+    "password_hash": "033ee0c03163c7779e0df8b9eeedadcc341ce798834b66d792ba4e9a66c9c841",
+    "password_salt": "bc2d9bd9d20f69c9"
+  },
+  {
+    "id": "直销",
+    "name": "直销",
+    "zone": "public",
+    "zone_name": "公众战区",
+    "color": "#1565c0",
+    "password_hash": "34936d85f9924bb80bb493935a8191809326aacc143db909c5835873c2420c40",
+    "password_salt": "0c280c354d9b5c64"
+  },
+  {
+    "id": "工程师（公）",
+    "name": "工程师（公）",
+    "zone": "public",
+    "zone_name": "公众战区",
+    "color": "#1565c0",
+    "password_hash": "8db319f4813a9ffdc63ab1ccde7fda8564d4f48767b76712b4695afbef074360",
+    "password_salt": "5bcae4ceb3ff3e8a"
+  },
+  {
+    "id": "营业员",
+    "name": "营业员",
+    "zone": "public",
+    "zone_name": "公众战区",
+    "color": "#1565c0",
+    "password_hash": "02da17505848952484cf3d9ed63d288e75ff7391b54ed3ccd902d85ec6e8249c",
+    "password_salt": "9b70e0cc23962d43"
+  },
+  {
+    "id": "存量专员",
+    "name": "存量专员",
+    "zone": "public",
+    "zone_name": "公众战区",
+    "color": "#1565c0",
+    "password_hash": "39520aa56022e29f9d0a443a727e8df74a4d1138589689f499bbeac64be76c9d",
+    "password_salt": "bc4b4396c98cc097"
+  },
+  {
+    "id": "渠道经理",
+    "name": "渠道经理",
+    "zone": "public",
+    "zone_name": "公众战区",
+    "color": "#1565c0",
+    "password_hash": "2df128538af776964987af6a63b1ebe8eef6dd18b5d69da79dddca7e5eb0428d",
+    "password_salt": "64a702c4ec734e54"
+  },
+  {
+    "id": "分局长（商）",
+    "name": "分局长（商）",
+    "zone": "business",
+    "zone_name": "商业战区",
+    "color": "#2e7d32",
+    "password_hash": "bfe540106d5a2cdfcce990f14e8e584b8d420eeb233e694070f311f0c63776a6",
+    "password_salt": "eaee245fdf7922ef"
+  },
+  {
+    "id": "客户经理（商）",
+    "name": "客户经理（商）",
+    "zone": "business",
+    "zone_name": "商业战区",
+    "color": "#2e7d32",
+    "password_hash": "5c01fc747352fe9542805c1ea7ef55eca38e1978067a90102e8a3c7b6747c0b2",
+    "password_salt": "18914e4c5116d561"
+  },
+  {
+    "id": "特战队",
+    "name": "特战队",
+    "zone": "business",
+    "zone_name": "商业战区",
+    "color": "#2e7d32",
+    "password_hash": "86d323751c0a1014bce2eb35e1efb629cff54e852ae5ec3906a8b19d4f2ed460",
+    "password_salt": "f775baa91ef454f8"
+  },
+  {
+    "id": "工程师（商）",
+    "name": "工程师（商）",
+    "zone": "business",
+    "zone_name": "商业战区",
+    "color": "#2e7d32",
+    "password_hash": "cbd92692a54814aeca3a834992cc6ad1a96f4d6ac29ddbacb6650b1979735847",
+    "password_salt": "0a32d240f9c1b08e"
+  },
+  {
+    "id": "分局长（校）",
+    "name": "分局长（校）",
+    "zone": "education",
+    "zone_name": "教科战区",
+    "color": "#7b1fa2",
+    "password_hash": "3499c8d596bcbdb9908b251e0c22d279431d3e7ead98d0106d1519cc2a530d8c",
+    "password_salt": "8d95d07c137eb718"
+  },
+  {
+    "id": "客户经理（校）",
+    "name": "客户经理（校）",
+    "zone": "education",
+    "zone_name": "教科战区",
+    "color": "#7b1fa2",
+    "password_hash": "5a09f3419cf1c0afa17f25670f845c1432e3d641a87111af464d676528d0678e",
+    "password_salt": "5adb96b06bd01b35"
+  },
+  {
+    "id": "分局长（行）",
+    "name": "分局长（行）",
+    "zone": "industry",
+    "zone_name": "行业战区",
+    "color": "#e65100",
+    "password_hash": "d57ea068c277764ffdea660dbd5e9c506d96926d846e7cd8ca5714e762f5c417",
+    "password_salt": "0b76832293d7b869"
+  },
+  {
+    "id": "客户经理（行）",
+    "name": "客户经理（行）",
+    "zone": "industry",
+    "zone_name": "行业战区",
+    "color": "#e65100",
+    "password_hash": "b29a38a50dd11b0b64b8d06fc3c9f4f225c8d9fae5a1f31f7ee52609a90bea4c",
+    "password_salt": "3c3cdbf653717d9f"
+  }
+]

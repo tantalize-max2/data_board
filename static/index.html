@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>百日攻坚"夏收"行动部署看板</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --ink-red:#8B1A1A;--ink-red-light:#A63A3A;--ink-dark:#1C1C1C;--ink-mid:#3E3E3E;
+  --ink-gray:#7A7A7A;--ink-light:#C8C0B0;--paper:#F5F0E6;--paper-light:#FBF8F0;
+  --cinnabar:#C0392B;--shadow:0 3px 16px rgba(28,28,28,.10);--shadow-hover:0 8px 32px rgba(28,28,28,.18)
+}
+body{font-family:'Noto Serif SC','Microsoft YaHei',serif;background:var(--paper);color:var(--ink-dark);line-height:1.6;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;
+  background:url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E") repeat,
+  radial-gradient(ellipse at 10% 15%,rgba(139,26,26,.05) 0%,transparent 50%),radial-gradient(ellipse at 90% 85%,rgba(44,44,68,.04) 0%,transparent 50%);
+  pointer-events:none;z-index:0}
+body>*{position:relative;z-index:1}
+.page{display:none;min-height:100vh}
+
+/* ====== 登录页 ====== */
+.page-login{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(160deg,#0d0d1a 0%,#1a1a2e 30%,#16213e 60%,#0f2a46 100%)}
+.page-login::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 25% 35%,rgba(139,26,26,.18),transparent 55%),radial-gradient(circle at 75% 65%,rgba(44,44,68,.12),transparent 55%);pointer-events:none}
+.page-login::after{content:'';position:absolute;top:10%;left:5%;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(139,26,26,.06) 0%,transparent 70%);filter:blur(40px);pointer-events:none}
+.login-box{background:linear-gradient(170deg,var(--paper-light),var(--paper));border-radius:6px;padding:52px 44px;width:480px;box-shadow:0 24px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.4);border:1px solid rgba(139,26,26,.12);position:relative;overflow:hidden}
+.login-box::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent 5%,var(--ink-red) 30%,var(--cinnabar) 50%,var(--ink-red) 70%,transparent 95%)}
+.login-box::after{content:'夏收';position:absolute;top:20px;right:24px;font-family:'Ma Shan Zheng',serif;font-size:28px;color:var(--ink-red);opacity:.08;letter-spacing:4px;writing-mode:vertical-rl}
+.login-box h1{text-align:center;font-size:28px;color:var(--ink-red);margin-bottom:6px;font-family:'Ma Shan Zheng',serif;letter-spacing:6px}
+.login-box .sub{text-align:center;color:var(--ink-gray);font-size:13px;margin-bottom:32px;letter-spacing:3px}
+.login-box label{display:block;font-size:14px;color:var(--ink-mid);margin-bottom:6px;font-weight:700;letter-spacing:1px}
+.login-box select,.login-box input{width:100%;height:46px;border:1px solid var(--ink-light);border-radius:4px;padding:0 14px;font-size:15px;outline:none;background:#fff;font-family:inherit;transition:all .25s}
+.login-box select:focus,.login-box input:focus{border-color:var(--ink-red);box-shadow:0 0 0 3px rgba(139,26,26,.08)}
+.login-box .field{margin-bottom:20px}
+.login-box .btn{width:100%;height:50px;background:linear-gradient(135deg,var(--ink-red),var(--cinnabar));color:#fff;border:none;border-radius:4px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:8px;transition:all .3s;position:relative;overflow:hidden}
+.login-box .btn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);transform:translateX(-100%);transition:transform .5s}
+.login-box .btn:hover::after{transform:translateX(100%)}
+.login-box .btn:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 6px 20px rgba(139,26,26,.3)}
+.login-box .error{color:var(--cinnabar);font-size:13px;text-align:center;margin-top:14px;min-height:20px}
+
+/* ====== 通用：标题栏 ====== */
+.header-bar{background:linear-gradient(160deg,#0d0d1a,#1a1a2e,#1C2833);padding:22px 28px;position:relative;overflow:hidden}
+.header-bar::before{content:'';position:absolute;top:-50%;left:-20%;width:140%;height:200%;background:radial-gradient(ellipse at 30% 60%,rgba(139,26,26,.1),transparent 50%);pointer-events:none}
+.header-bar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent 5%,var(--ink-red) 25%,var(--cinnabar) 50%,var(--ink-red) 75%,transparent 95%)}
+.header-inner{max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center}
+.header-title{font-family:'Ma Shan Zheng',serif;font-size:34px;color:#F0E6D8;letter-spacing:10px;text-shadow:0 0 20px rgba(139,26,26,.3),0 2px 4px rgba(0,0,0,.5)}
+.header-user{display:flex;align-items:center;gap:10px}
+.zone-badge{padding:3px 14px;border-radius:3px;font-size:11px;color:#F0E6D8;letter-spacing:1px;border:1px solid rgba(255,255,255,.15)}
+.role-badge{padding:4px 18px;border-radius:3px;font-size:13px;font-weight:700;color:#F0E6D8;letter-spacing:1px;background:linear-gradient(135deg,rgba(139,26,26,.6),rgba(192,57,43,.5));border:1px solid rgba(139,26,26,.3)}
+.btn-logout{padding:5px 16px;border:1px solid rgba(240,230,216,.25);border-radius:3px;background:transparent;color:rgba(240,230,216,.6);cursor:pointer;font-size:12px;font-family:inherit;transition:all .25s;letter-spacing:1px}
+.btn-logout:hover{border-color:var(--cinnabar);color:var(--cinnabar)}
+
+/* 通用：子页面头部 */
+.sub-header{background:linear-gradient(160deg,#0d0d1a,#1a1a2e,#1C2833);padding:16px 28px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;flex-wrap:wrap}
+.sub-header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent 5%,var(--ink-red) 25%,var(--cinnabar) 50%,var(--ink-red) 75%,transparent 95%)}
+.back-btn{padding:7px 18px;border:1px solid rgba(240,230,216,.25);border-radius:3px;background:transparent;color:rgba(240,230,216,.7);cursor:pointer;font-family:inherit;font-size:13px;transition:all .25s;white-space:nowrap;letter-spacing:1px}
+.back-btn:hover{border-color:var(--cinnabar);color:var(--cinnabar)}
+.sub-title{font-family:'Ma Shan Zheng',serif;font-size:25px;color:#F0E6D8;letter-spacing:4px;text-shadow:0 0 12px rgba(139,26,26,.25)}
+.sub-title-sep{color:rgba(240,230,216,.3);font-size:18px}
+.sub-info{margin-left:auto;font-size:12px;color:rgba(240,230,216,.4);letter-spacing:1px}
+.sub-body{max-width:1400px;margin:0 auto;padding:24px 28px}
+
+/* 面包屑 */
+.breadcrumb{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.breadcrumb .crumb{font-size:14px;color:rgba(240,230,216,.55);cursor:pointer;transition:color .2s;letter-spacing:1px}
+.breadcrumb .crumb:hover{color:rgba(240,230,216,.9)}
+.breadcrumb .crumb.active{color:#F0E6D8;font-weight:700;cursor:default}
+.breadcrumb .sep{color:rgba(240,230,216,.25);font-size:10px}
+
+/* ====== 主页 ====== */
+.main-body{max-width:1400px;margin:0 auto;padding:32px 28px}
+.section-label{font-size:16px;font-weight:700;color:var(--ink-red);margin-bottom:14px;padding-left:12px;border-left:4px solid var(--ink-red);letter-spacing:3px;position:relative}
+.section-label::after{content:'';position:absolute;left:-7px;top:50%;width:10px;height:10px;border-radius:50%;background:var(--ink-red);opacity:.3;transform:translateY(-50%)}
+
+/* 战役/战区 通用卡片网格 */
+.card-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:36px}
+.card-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:36px}
+
+.card-item{background:linear-gradient(170deg,#fff,var(--paper-light));border-radius:4px;padding:26px 22px;cursor:pointer;transition:all .35s;position:relative;overflow:hidden;border:1px solid var(--ink-light);box-shadow:var(--shadow)}
+.card-item::before{content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;border-radius:5px;background:linear-gradient(135deg,transparent 40%,var(--ink-red) 50%,transparent 60%);opacity:0;transition:opacity .35s;z-index:-1}
+.card-item:hover{transform:translateY(-5px);box-shadow:var(--shadow-hover);border-color:var(--ink-red)}
+.card-item:hover::before{opacity:.15}
+.card-item::after{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,transparent,var(--ink-red),transparent);opacity:.5;transition:opacity .3s}
+.card-item:hover::after{opacity:.9}
+.card-item .card-name{font-size:20px;font-weight:700;letter-spacing:4px;margin-bottom:8px;padding-left:8px}
+.card-item .card-count{font-size:13px;color:var(--ink-gray);padding-left:8px}
+.card-item .card-arrow{position:absolute;right:20px;top:50%;transform:translateY(-50%);font-size:20px;opacity:.2;transition:all .3s;color:var(--ink-red)}
+.card-item:hover .card-arrow{opacity:.6;right:16px}
+
+/* 战区型卡片（居中无箭头） */
+.card-center{text-align:center;padding:30px 20px}
+.card-center .card-name{font-size:20px;font-weight:700;letter-spacing:5px;margin-bottom:8px;padding-left:0}
+.card-center .card-count{padding-left:0}
+.card-center::after{display:none}
+.card-center::before-extra{content:''}
+
+/* 兵种区 */
+.troop-overview{background:linear-gradient(170deg,rgba(139,26,26,.04),rgba(139,26,26,.02));border:1px solid rgba(139,26,26,.10);border-radius:4px;padding:20px 24px;margin-bottom:28px;position:relative;overflow:hidden}
+.troop-overview::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(139,26,26,.05),transparent 70%);pointer-events:none}
+.troop-overview .label{font-weight:700;font-size:14px;color:var(--ink-red);margin-bottom:12px;letter-spacing:3px;padding-left:10px;border-left:3px solid var(--ink-red)}
+.troop-zones-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.troop-zone-group .tz-name{font-size:13px;font-weight:700;margin-bottom:8px;letter-spacing:2px;padding-bottom:4px;border-bottom:1px solid rgba(0,0,0,.06)}
+.troop-zone-group .tz-roles{display:flex;flex-wrap:wrap;gap:6px}
+.tz-tag{padding:5px 14px;border-radius:3px;font-size:12px;background:var(--paper-light);border:1px solid var(--ink-light);color:var(--ink-mid);cursor:default;transition:all .25s;font-family:inherit;font-weight:500;letter-spacing:1px}
+.tz-tag.is-me{color:#F0E6D8;font-weight:700;border-color:transparent;background:linear-gradient(135deg,var(--ink-red),var(--cinnabar));box-shadow:0 2px 8px rgba(139,26,26,.2)}
+
+/* 标语 */
+.motto-section{text-align:center;padding:28px 24px;margin:20px 0;position:relative}
+.motto-section::before,.motto-section::after{content:'';position:absolute;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,rgba(139,26,26,.2),transparent)}
+.motto-section::before{top:0}.motto-section::after{bottom:0}
+.motto-text{font-family:'Ma Shan Zheng',serif;color:var(--ink-red);font-size:22px;letter-spacing:6px;opacity:.7}
+.motto-sub{font-family:'Ma Shan Zheng',serif;color:var(--ink-gray);font-size:16px;letter-spacing:4px;opacity:.5;margin-top:8px}
+
+/* ====== 层级模块 ====== */
+.module-section{margin-bottom:28px}
+.module-title{font-size:15px;font-weight:700;color:var(--ink-red);margin-bottom:14px;padding-left:12px;border-left:4px solid var(--ink-red);letter-spacing:3px;position:relative}
+.module-title::after{content:'';position:absolute;left:-7px;top:50%;width:10px;height:10px;border-radius:50%;background:var(--ink-red);opacity:.3;transform:translateY(-50%)}
+
+/* 信息卡片 */
+.info-card{background:linear-gradient(170deg,#fff,var(--paper-light));border-radius:4px;border:1px solid rgba(200,192,176,.6);box-shadow:0 2px 8px rgba(28,28,28,.05);overflow:hidden;position:relative}
+.info-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ink-red),var(--cinnabar),var(--ink-red));opacity:.4}
+.card-fields{padding:16px 20px 12px}
+.field-row{display:flex;align-items:flex-start;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.03)}
+.field-row:last-child{border-bottom:none}
+.field-label{flex-shrink:0;width:140px;font-size:13px;color:var(--ink-mid);font-weight:900;letter-spacing:1px;padding-top:2px}
+.field-label::after{content:'';display:inline-block;width:3px;height:14px;margin-left:8px;vertical-align:middle;background:linear-gradient(180deg,transparent 5%,rgba(139,26,26,.5) 50%,transparent 95%);border-radius:2px;box-shadow:0 0 4px rgba(139,26,26,.15)}
+.field-value{flex:1;font-size:15px;color:var(--ink-dark);font-weight:900;line-height:1.7;word-break:break-all;letter-spacing:.5px}
+.field-value.empty{color:var(--ink-light);font-style:italic;font-weight:400}
+
+/* 路径卡片 */
+.path-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.path-card{background:linear-gradient(170deg,#fff,var(--paper-light));border-radius:4px;border:1px solid rgba(200,192,176,.6);box-shadow:0 2px 8px rgba(28,28,28,.05);padding:20px 22px;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
+.path-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ink-red),var(--cinnabar),var(--ink-red));opacity:.4;transition:opacity .3s}
+.path-card:hover{box-shadow:0 6px 20px rgba(28,28,28,.1);transform:translateY(-2px);border-color:rgba(139,26,26,.2)}
+.path-card:hover::before{opacity:.8}
+.path-card .path-name{font-size:17px;font-weight:900;color:var(--ink-dark);letter-spacing:2px;margin-bottom:6px}
+.path-card .path-target{font-size:13px;color:var(--ink-gray);margin-bottom:8px}
+.path-card .path-meta{display:flex;align-items:center;justify-content:space-between}
+.path-card .path-id{font-size:12px;color:var(--ink-gray);letter-spacing:1px}
+.path-card .path-scenes{font-size:12px;color:var(--ink-red);font-weight:700;letter-spacing:1px}
+.path-card .path-arrow{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:16px;opacity:.2;color:var(--ink-red);transition:all .3s}
+.path-card:hover .path-arrow{opacity:.6;right:12px}
+
+/* 场景卡片 */
+.scene-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px}
+.scene-card{background:linear-gradient(170deg,#fff,var(--paper-light));border-radius:4px;border:1px solid rgba(200,192,176,.6);box-shadow:0 2px 8px rgba(28,28,28,.05);overflow:hidden;position:relative;transition:all .3s}
+.scene-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ink-red),var(--cinnabar),var(--ink-red));opacity:.4}
+.scene-card:hover{box-shadow:0 6px 20px rgba(28,28,28,.1);transform:translateY(-2px)}
+.scene-card .scene-header{padding:16px 20px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(0,0,0,.04)}
+.scene-card .scene-id{font-family:'Ma Shan Zheng',serif;font-size:28px;color:var(--ink-red);opacity:.15;line-height:1}
+.scene-card .scene-name{font-size:16px;font-weight:900;color:var(--ink-dark);letter-spacing:1px;flex:1}
+.scene-card .scene-fields{padding:12px 20px 16px}
+.scene-card .field-label{width:160px}
+
+.empty-state{text-align:center;padding:60px 20px;color:var(--ink-light);font-size:15px;letter-spacing:3px}
+.loading{text-align:center;padding:40px;color:var(--ink-gray);font-size:14px;letter-spacing:1px}
+
+/* 响应式 */
+@media(max-width:1100px){.path-grid{grid-template-columns:minmax(300px,1fr)}.scene-grid{grid-template-columns:minmax(340px,1fr)}}
+@media(max-width:900px){
+  .card-grid-3{grid-template-columns:repeat(2,1fr)}.card-grid-4{grid-template-columns:repeat(2,1fr)}.troop-zones-grid{grid-template-columns:repeat(2,1fr)}
+  .header-title{font-size:24px;letter-spacing:5px}.path-grid,.scene-grid{grid-template-columns:1fr}
+  .field-label{width:110px}.scene-card .field-label{width:130px}
+}
+@media(max-width:600px){
+  .card-grid-3,.card-grid-4,.troop-zones-grid{grid-template-columns:1fr}
+  .header-title{font-size:18px;letter-spacing:3px}.header-inner{flex-direction:column;gap:10px}
+  .path-grid,.scene-grid{grid-template-columns:1fr}
+  .field-row{flex-direction:column}.field-label{width:auto;margin-bottom:2px}
+  .scene-card .field-row{flex-direction:column}.scene-card .field-label{width:auto}
+  .login-box{margin:16px;padding:32px 24px;width:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- 登录页 -->
+<div class="page page-login" id="pageLogin">
+  <div class="login-box">
+    <h1>百日攻坚"夏收"行动</h1>
+    <div class="sub">行动部署看板 · 权限控制</div>
+    <div class="field"><label>选择角色</label><select id="selRole"></select></div>
+    <div class="field"><label>输入密码</label><input type="password" id="txtPwd" placeholder="请输入密码"></div>
+    <button class="btn" onclick="doLogin()">进 入</button>
+    <div class="error" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- 主页 -->
+<div class="page page-main" id="pageMain">
+  <div class="header-bar"><div class="header-inner">
+    <div class="header-title">百日攻坚"夏收"行动部署看板</div>
+    <div class="header-user"><span class="zone-badge" id="mainZoneBadge"></span><span class="role-badge" id="mainRoleBadge"></span><button class="btn-logout" onclick="doLogout()">退出</button></div>
+  </div></div>
+  <div class="main-body">
+    <div class="section-label">六大战役</div><div class="card-grid-3" id="mainBattleGrid"></div>
+    <div class="section-label">四大战区</div><div class="card-grid-4" id="mainZoneGrid"></div>
+    <div class="troop-overview"><div class="label">兵种</div><div class="troop-zones-grid" id="mainTroopZones"></div></div>
+    <div class="motto-section"><div class="motto-text">以"商机+标准化"为灵魂</div><div class="motto-sub">扎硬寨，打呆仗，走笨路，用凡人，要巧思，需新为</div></div>
+  </div>
+</div>
+
+<!-- 战役→战区选择页 -->
+<div class="page page-battle-zones" id="pageBattleZones">
+  <div class="sub-header">
+    <button class="back-btn" onclick="goMain()">&#8592; 返回主页</button>
+    <div class="sub-title" id="bzTitle"></div>
+    <div class="sub-info" id="bzInfo"></div>
+  </div>
+  <div class="sub-body" id="bzBody"></div>
+</div>
+
+<!-- 战区→战役选择页 -->
+<div class="page page-zone-battles" id="pageZoneBattles">
+  <div class="sub-header">
+    <button class="back-btn" onclick="goMain()">&#8592; 返回主页</button>
+    <div class="sub-title" id="zbTitle"></div>
+    <div class="sub-info" id="zbInfo"></div>
+  </div>
+  <div class="sub-body" id="zbBody"></div>
+</div>
+
+<!-- 数据详情页（战役+战区交叉） -->
+<div class="page page-detail" id="pageDetail">
+  <div class="sub-header">
+    <button class="back-btn" onclick="goMain()">&#8592; 主页</button>
+    <div class="breadcrumb" id="detailBreadcrumb"></div>
+    <div class="sub-info" id="detailInfo"></div>
+  </div>
+  <div class="sub-body" id="detailBody"></div>
+</div>
+
+<!-- 路径→场景详情页 -->
+<div class="page page-path" id="pagePath">
+  <div class="sub-header">
+    <button class="back-btn" onclick="goMain()">&#8592; 主页</button>
+    <div class="breadcrumb" id="pathBreadcrumb"></div>
+    <div class="sub-info" id="pathInfo"></div>
+  </div>
+  <div class="sub-body" id="pathBody"></div>
+</div>
+
+<script>
+const WARZONES=[
+  {id:"public",name:"公众战区",color:"#1565c0",roles:["分局长（公）","直销","工程师（公）","营业员","存量专员","渠道经理"]},
+  {id:"business",name:"商业战区",color:"#2e7d32",roles:["分局长（商）","客户经理（商）","特战队","工程师（商）"]},
+  {id:"education",name:"教科战区",color:"#7b1fa2",roles:["分局长（校）","客户经理（校）"]},
+  {id:"industry",name:"行业战区",color:"#e65100",roles:["分局长（行）","客户经理（行）"]},
+];
+const BATTLES=[
+  {id:"b1",name:"一号工程战",color:"#c62828"},
+  {id:"b2",name:"百万加装战",color:"#1565c0"},
+  {id:"b3",name:"高价值新增战",color:"#2e7d32"},
+  {id:"b4",name:"双线+标准ICT固本战",color:"#7b1fa2"},
+  {id:"b5",name:"项目掘金战",color:"#e65100"},
+  {id:"b6",name:"细分市场战",color:"#00838f"},
+];
+const ROLES_LIST=[
+  {id:"总经理",name:"总经理",zone:"all",zone_name:"全部战区",color:"#8B1A1A"},
+  {id:"分局长（公）",name:"分局长（公）",zone:"public",zone_name:"公众战区",color:"#1565c0"},
+  {id:"直销",name:"直销",zone:"public",zone_name:"公众战区",color:"#1565c0"},
+  {id:"工程师（公）",name:"工程师（公）",zone:"public",zone_name:"公众战区",color:"#1565c0"},
+  {id:"营业员",name:"营业员",zone:"public",zone_name:"公众战区",color:"#1565c0"},
+  {id:"存量专员",name:"存量专员",zone:"public",zone_name:"公众战区",color:"#1565c0"},
+  {id:"渠道经理",name:"渠道经理",zone:"public",zone_name:"公众战区",color:"#1565c0"},
+  {id:"分局长（商）",name:"分局长（商）",zone:"business",zone_name:"商业战区",color:"#2e7d32"},
+  {id:"客户经理（商）",name:"客户经理（商）",zone:"business",zone_name:"商业战区",color:"#2e7d32"},
+  {id:"特战队",name:"特战队",zone:"business",zone_name:"商业战区",color:"#2e7d32"},
+  {id:"工程师（商）",name:"工程师（商）",zone:"business",zone_name:"商业战区",color:"#2e7d32"},
+  {id:"分局长（校）",name:"分局长（校）",zone:"education",zone_name:"教科战区",color:"#7b1fa2"},
+  {id:"客户经理（校）",name:"客户经理（校）",zone:"education",zone_name:"教科战区",color:"#7b1fa2"},
+  {id:"分局长（行）",name:"分局长（行）",zone:"industry",zone_name:"行业战区",color:"#e65100"},
+  {id:"客户经理（行）",name:"客户经理（行）",zone:"industry",zone_name:"行业战区",color:"#e65100"},
+];
+
+let TOKEN='',ROLE=null;
+
+(function(){
+  const sel=document.getElementById('selRole'),groups={};
+  ROLES_LIST.forEach(r=>{const g=r.zone==='all'?'管理层':r.zone_name;if(!groups[g])groups[g]=[];groups[g].push(r);});
+  ['管理层','公众战区','商业战区','教科战区','行业战区'].forEach(g=>{
+    if(!groups[g])return;const og=document.createElement('optgroup');og.label=g;
+    groups[g].forEach(r=>{const o=document.createElement('option');o.value=r.id;o.text=r.name;og.appendChild(o);});sel.appendChild(og);
+  });
+})();
+document.getElementById('txtPwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+  // 将name转为驼峰：battle-zones → BattleZones
+  const camel='page'+name.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()).replace(/^./,s=>s.toUpperCase());
+  const el=document.getElementById(camel);
+  if(el)el.style.display='block';window.scrollTo(0,0);
+}
+function goMain(){showPage('main');}
+
+async function doLogin(){
+  const rid=document.getElementById('selRole').value,pwd=document.getElementById('txtPwd').value;
+  if(!rid){showErr('请选择角色');return;}if(!pwd){showErr('请输入密码');return;}
+  try{
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role_id:rid,password:pwd})});
+    if(!res.ok){const d=await res.json();showErr(d.detail||'登录失败');return;}
+    const data=await res.json();TOKEN=data.token;ROLE=data.role;showPage('main');loadMainPage();
+  }catch(e){showErr('网络错误');}
+}
+function showErr(m){document.getElementById('loginErr').textContent=m;}
+async function doLogout(){
+  try{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN})});}catch(e){}
+  TOKEN='';ROLE=null;document.getElementById('txtPwd').value='';document.getElementById('loginErr').textContent='';showPage('login');
+}
+
+/* ====== 主页 ====== */
+async function loadMainPage(){
+  document.getElementById('mainRoleBadge').textContent=ROLE.name;
+  document.getElementById('mainRoleBadge').style.background='linear-gradient(135deg,rgba(139,26,26,.6),rgba(192,57,43,.5))';
+  document.getElementById('mainZoneBadge').textContent=ROLE.zone_name;
+  document.getElementById('mainZoneBadge').style.background=ROLE.color+'44';
+  try{
+    const res=await fetch('/api/overview?token='+TOKEN);
+    if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
+    const data=await res.json();
+    renderBattleGrid(data.battles);renderZoneGrid(data.zones);renderTroopOverview(data.zones);
+  }catch(e){document.getElementById('mainBattleGrid').innerHTML='<div class="empty-state">加载失败</div>';}
+}
+
+function renderBattleGrid(battles){
+  let h='';battles.forEach(b=>{
+    h+=`<div class="card-item" onclick="openBattleZones('${b.id}')"><div class="card-name" style="color:${b.color}">${esc(b.name)}</div><div class="card-count">${b.count}条数据</div><div class="card-arrow">&#10095;</div></div>`;
+  });if(!h)h='<div class="empty-state">暂无相关战役数据</div>';
+  document.getElementById('mainBattleGrid').innerHTML=h;
+}
+
+function renderZoneGrid(zones){
+  let h='';zones.forEach(z=>{
+    h+=`<div class="card-item card-center" onclick="openZoneBattles('${z.id}')"><div class="card-name" style="color:${z.color}">${esc(z.name)}</div><div class="card-count">${z.count}条数据</div></div>`;
+  });document.getElementById('mainZoneGrid').innerHTML=h;
+}
+
+function renderTroopOverview(zones){
+  let h='';zones.forEach(z=>{
+    let tags='';(z.roles||[]).forEach(r=>{
+      const isMe=r===ROLE.id;
+      tags+=`<span class="tz-tag${isMe?' is-me':''}">${esc(r)}</span>`;
+    });h+=`<div class="troop-zone-group"><div class="tz-name" style="color:${z.color}">${esc(z.name)}</div><div class="tz-roles">${tags}</div></div>`;
+  });document.getElementById('mainTroopZones').innerHTML=h;
+}
+
+/* ====== 战役→战区选择 ====== */
+async function openBattleZones(bid){
+  showPage('battle-zones');
+  document.getElementById('bzTitle').textContent='加载中...';
+  document.getElementById('bzInfo').textContent='';
+  document.getElementById('bzBody').innerHTML='<div class="loading">加载中...</div>';
+  try{
+    const res=await fetch('/api/battle-zones/'+bid+'?token='+TOKEN);
+    if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
+    const data=await res.json();
+    document.getElementById('bzTitle').textContent=data.battle.name;
+    document.getElementById('bzInfo').textContent='共'+data.total+'条数据';
+    let h='<div class="section-label">请选择战区</div><div class="card-grid-4">';
+    data.zones.forEach(z=>{
+      h+=`<div class="card-item card-center" onclick="openDetail('${bid}','${z.id}')">
+        <div class="card-name" style="color:${z.color}">${esc(z.name)}</div>
+        <div class="card-count">${z.count}条数据</div></div>`;
+    });
+    h+='</div>';
+    if(!data.zones.length)h='<div class="empty-state">该战役暂无战区数据</div>';
+    document.getElementById('bzBody').innerHTML=h;
+  }catch(e){document.getElementById('bzBody').innerHTML='<div class="empty-state">加载失败</div>';}
+}
+
+/* ====== 战区→战役选择 ====== */
+async function openZoneBattles(zid){
+  showPage('zone-battles');
+  document.getElementById('zbTitle').textContent='加载中...';
+  document.getElementById('zbInfo').textContent='';
+  document.getElementById('zbBody').innerHTML='<div class="loading">加载中...</div>';
+  try{
+    const res=await fetch('/api/zone-battles/'+zid+'?token='+TOKEN);
+    if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
+    const data=await res.json();
+    document.getElementById('zbTitle').textContent=data.zone.name;
+    document.getElementById('zbInfo').textContent='共'+data.total+'条数据';
+    let h='<div class="section-label">请选择战役</div><div class="card-grid-3">';
+    data.battles.forEach(b=>{
+      h+=`<div class="card-item" onclick="openDetail('${b.id}','${zid}')">
+        <div class="card-name" style="color:${b.color}">${esc(b.name)}</div>
+        <div class="card-count">${b.count}条数据</div>
+        <div class="card-arrow">&#10095;</div></div>`;
+    });
+    h+='</div>';
+    if(!data.battles.length)h='<div class="empty-state">该战区暂无战役数据</div>';
+    document.getElementById('zbBody').innerHTML=h;
+  }catch(e){document.getElementById('zbBody').innerHTML='<div class="empty-state">加载失败</div>';}
+}
+
+/* ====== 数据详情页（战役+战区交叉） ====== */
+async function openDetail(bid,zid){
+  showPage('detail');
+  document.getElementById('detailBreadcrumb').innerHTML='<span class="loading">加载中...</span>';
+  document.getElementById('detailInfo').textContent='';
+  document.getElementById('detailBody').innerHTML='<div class="loading">加载中...</div>';
+  try{
+    const res=await fetch('/api/detail/'+bid+'/'+zid+'?token='+TOKEN);
+    if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
+    const data=await res.json();
+    // 面包屑
+    const bc=document.getElementById('detailBreadcrumb');
+    bc.innerHTML=`
+      <span class="crumb" onclick="openBattleZones('${bid}')">${esc(data.battle.name)}</span>
+      <span class="sep">&#10095;</span>
+      <span class="crumb" onclick="openZoneBattles('${zid}')">${esc(data.zone.name)}</span>
+      <span class="sep">&#10095;</span>
+      <span class="crumb active">数据详情</span>`;
+    document.getElementById('detailInfo').textContent='共'+data.total+'条数据';
+    renderDetailPage(data);
+  }catch(e){document.getElementById('detailBody').innerHTML='<div class="empty-state">加载失败</div>';}
+}
+
+function renderDetailPage(data){
+  const el=document.getElementById('detailBody');let h='';
+
+  // 基本信息
+  if(data.basic){
+    h+=`<div class="module-section"><div class="module-title">基本信息</div><div class="info-card"><div class="card-fields">`;
+    const fields={"战役编号":"战役编号","战役":"战役","战区":"战区","指导角色":"指导角色（营销统筹/专员）","作战角色":"作战角色"};
+    for(const[label,key] of Object.entries(fields)){
+      const v=(data.basic[key]||'').trim();
+      h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
+    }
+    h+=`</div></div></div>`;
+  }
+
+  // 目标
+  if(data.targets){
+    const t=data.targets;const hasVal=Object.values(t).some(v=>v&&v.trim());
+    if(hasVal){
+      h+=`<div class="module-section"><div class="module-title">目标</div><div class="info-card"><div class="card-fields">`;
+      for(const[label,key] of [['战役总目标','战役总目标'],['战区总目标','战区总目标']]){
+        const v=(t[key]||'').trim();
+        h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
+      }
+      h+=`</div></div></div>`;
+    }
+  }
+
+  // 路径列表
+  if(data.paths&&data.paths.length){
+    h+=`<div class="module-section"><div class="module-title">路径</div><div class="path-grid">`;
+    data.paths.forEach(p=>{
+      h+=`<div class="path-card" onclick="openPath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}')">
+        <div class="path-name">${esc(p.path_name)}</div>
+        <div class="path-target">${p.path_target?esc(p.path_target):'暂无路径目标'}</div>
+        <div class="path-meta"><span class="path-id">编号 ${esc(p.path_id)}</span><span class="path-scenes">${p.scene_count}个场景</span></div>
+        <span class="path-arrow">&#10095;</span></div>`;
+    });
+    h+=`</div></div>`;
+  }
+
+  if(!h)h='<div class="empty-state">暂无数据</div>';
+  el.innerHTML=h;
+}
+
+/* ====== 路径→场景详情 ====== */
+async function openPath(bid,zid,pid){
+  showPage('path');
+  document.getElementById('pathBreadcrumb').innerHTML='<span class="loading">加载中...</span>';
+  document.getElementById('pathInfo').textContent='';
+  document.getElementById('pathBody').innerHTML='<div class="loading">加载中...</div>';
+  try{
+    const res=await fetch('/api/path-detail/'+bid+'/'+zid+'/'+encodeURIComponent(pid)+'?token='+TOKEN);
+    if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
+    const data=await res.json();
+    const bc=document.getElementById('pathBreadcrumb');
+    bc.innerHTML=`
+      <span class="crumb" onclick="openBattleZones('${bid}')">${esc(data.battle.name)}</span>
+      <span class="sep">&#10095;</span>
+      <span class="crumb" onclick="openZoneBattles('${zid}')">${esc(data.zone.name)}</span>
+      <span class="sep">&#10095;</span>
+      <span class="crumb" onclick="openDetail('${bid}','${zid}')">数据详情</span>
+      <span class="sep">&#10095;</span>
+      <span class="crumb active">${esc(data.path?.path_name||pid)}</span>`;
+    document.getElementById('pathInfo').textContent=(data.scenes?.length||0)+'个场景';
+    renderPathPage(data);
+  }catch(e){document.getElementById('pathBody').innerHTML='<div class="empty-state">加载失败</div>';}
+}
+
+function renderPathPage(data){
+  const el=document.getElementById('pathBody');let h='';
+
+  if(data.path){
+    h+=`<div class="module-section"><div class="module-title">路径信息</div><div class="info-card"><div class="card-fields">`;
+    [['路径编号','path_id'],['路径','path_name'],['路径目标','path_target']].forEach(([label,key])=>{
+      const v=(data.path[key]||'').trim();
+      h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
+    });
+    h+=`</div></div></div>`;
+  }
+
+  if(data.scenes&&data.scenes.length){
+    h+=`<div class="module-section"><div class="module-title">场景</div><div class="scene-grid">`;
+    data.scenes.forEach(s=>{
+      h+=`<div class="scene-card"><div class="scene-header"><span class="scene-id">${esc(s['场景编号'])}</span><span class="scene-name">${esc(s['场景']||'未命名场景')}</span></div><div class="scene-fields">`;
+      [['政策','政策'],['激励','激励'],['标准话术','标准话术'],['商机来源','商机来源'],['最短管控周期','最短管控周期'],['最短管控动作（量）','最短管控动作（量）'],['最短管控目标（积分/金额）','最短管控目标（积分/金额）'],['闭环管控','闭环管控']].forEach(([label,key])=>{
+        const v=(s[key]||'').trim();
+        h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
+      });
+      h+=`</div></div>`;
+    });
+    h+=`</div></div>`;
+  }
+
+  if(!h)h='<div class="empty-state">暂无数据</div>';
+  el.innerHTML=h;
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>
