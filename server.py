@@ -107,21 +107,30 @@ def get_accessible_pairs(s: dict) -> List[tuple]:
 
 
 def get_role_rows(s: dict) -> List[dict]:
-    """返回该用户可见的所有实质性记录"""
-    pairs = get_accessible_pairs(s)
-    if pairs is None:
+    """返回该用户可见的所有实质性记录
+    分局长/客户经理作为战区负责人，自动获得本战区全部数据权限。
+    """
+    if s.get("is_admin"):
         sql = "SELECT * FROM deployment_records ORDER BY sort_order, id"
         rows = db.query_all(sql)
-    else:
-        if not pairs:
-            return []
-        # 用 OR 拼接 (battle_id, warzone_id) 组合
-        where = " OR ".join(["(battle_id=%s AND warzone_id=%s)"] * len(pairs))
-        args = []
-        for b, w in pairs:
-            args.extend([b, w])
-        sql = f"SELECT * FROM deployment_records WHERE {where} ORDER BY sort_order, id"
-        rows = db.query_all(sql, args)
+        return [r for r in rows if has_substantive(r)]
+    # 战区负责人（分局长/客户经理）：本战区全部数据
+    me = db.query_one("SELECT zone,role_name FROM users WHERE username=%s AND is_active=1", (s["username"],))
+    if me and ("分局长" in (me["role_name"] or "") or "客户经理" in (me["role_name"] or "")):
+        rows = db.query_all(
+            "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
+            (me["zone"],))
+        return [r for r in rows if has_substantive(r)]
+    # 普通执行角色：仅 role_access 授权板块
+    pairs = get_accessible_pairs(s)
+    if not pairs:
+        return []
+    where = " OR ".join(["(battle_id=%s AND warzone_id=%s)"] * len(pairs))
+    args = []
+    for b, w in pairs:
+        args.extend([b, w])
+    sql = f"SELECT * FROM deployment_records WHERE {where} ORDER BY sort_order, id"
+    rows = db.query_all(sql, args)
     return [r for r in rows if has_substantive(r)]
 
 
@@ -339,6 +348,54 @@ async def search(request: Request, keyword: str = ""):
                 "warzone_color": w.get("color", ""),
             })
     return {"keyword": kw, "results": matched, "total": len(matched)}
+
+
+@app.get("/api/role-battles/{role_id}")
+async def role_battles(role_id: str, request: Request):
+    """查看某角色的战役信息（兵种标签点击）
+    权限：总经理可查任何；分局长/客户经理可查本战区角色；其余只能查自己。
+    """
+    s = require_session(request)
+    target = db.query_one("SELECT zone,role_name FROM users WHERE role_id=%s AND is_active=1", (role_id,))
+    if not target:
+        raise HTTPException(404, "角色不存在")
+    if not s.get("is_admin") and s["role_id"] != role_id:
+        me = db.query_one("SELECT zone,role_name FROM users WHERE username=%s AND is_active=1", (s["username"],))
+        if not me or me["zone"] != target["zone"]:
+            raise HTTPException(403, "无权查看其它战区角色")
+        if "分局长" not in (me["role_name"] or "") and "客户经理" not in (me["role_name"] or ""):
+            raise HTTPException(403, "仅分局长/客户经理可查看本战区其它兵种")
+
+    bl = battle_lookup()
+    wl = warzone_lookup()
+    pairs = db.query_all("SELECT DISTINCT battle_id,warzone_id FROM role_access WHERE role_id=%s", (role_id,))
+    if not pairs:
+        return {"role_id": role_id, "role_name": target["role_name"], "zone": target["zone"],
+                "battles": [], "total": 0}
+
+    battles = []
+    for bid in sorted(set(p["battle_id"] for p in pairs)):
+        b = bl.get(bid)
+        if not b:
+            continue
+        zids = [p["warzone_id"] for p in pairs if p["battle_id"] == bid]
+        ph = ",".join(["%s"] * len(zids))
+        rows = db.query_all(
+            f"SELECT * FROM deployment_records WHERE battle_id=%s AND warzone_id IN ({ph})",
+            [bid] + zids)
+        rows = [r for r in rows if has_substantive(r)]
+        if not rows:
+            continue
+        zones = []
+        for zid in sorted(set(r["warzone_id"] for r in rows)):
+            w = wl.get(zid)
+            if w:
+                zcnt = len([r for r in rows if r["warzone_id"] == zid])
+                zones.append({"id": w["id"], "name": w["name"], "color": w["color"], "count": zcnt})
+        battles.append({"id": b["id"], "name": b["name"], "color": b["color"],
+                        "count": len(rows), "zones": zones})
+    return {"role_id": role_id, "role_name": target["role_name"], "zone": target["zone"],
+            "battles": battles, "total": sum(b["count"] for b in battles)}
 
 
 @app.get("/api/battle-zones/{battle_id}")
