@@ -526,9 +526,11 @@ let TOKEN='',ROLE=null;
   try{
     const res=await fetch('/api/roles');
     const groups=await res.json();
-    ['管理层','公众战区','商业战区','教科战区','行业战区'].forEach(g=>{
-      if(!groups[g])return;const og=document.createElement('optgroup');og.label=g;
-      groups[g].forEach(r=>{const o=document.createElement('option');o.value=r.id;o.text=r.name;og.appendChild(o);});sel.appendChild(og);
+    ['管理层','公众战区','商业战区','教科战区','行业战区'].forEach((g,idx)=>{
+      if(!groups[g])return;
+      if(idx>0){const sep=document.createElement('option');sep.disabled=true;sep.text='──────────';sep.style.color='var(--cyan)';sep.style.fontWeight='700';sel.appendChild(sep);}
+      const head=document.createElement('option');head.disabled=true;head.text='【 '+g+' 】';head.style.color='var(--cyan)';head.style.fontWeight='700';sel.appendChild(head);
+      groups[g].forEach(r=>{const o=document.createElement('option');o.value=r.id;o.text='  '+r.name;sel.appendChild(o);});
     });
   }catch(e){sel.innerHTML='<option>角色加载失败</option>'}
   /* 检测 URL token 参数（从管理后台返回时），自动恢复会话进入主页 */
