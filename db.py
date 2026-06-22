@@ -5,6 +5,22 @@
 import pymysql
 from dbutils.pooled_db import PooledDB
 
+import ssl as _ssl
+
+# 解决 Anaconda 环境 Windows 证书库损坏导致 SSL 报错的问题
+# pymysql 连接时会调用 ssl.create_default_context() 加载系统证书，
+# 部分环境下证书损坏会抛 SSLError，此处 monkey-patch 为容错版本。
+_orig_ctx = _ssl.create_default_context
+def _safe_create_default_context(*a, **kw):
+    try:
+        return _orig_ctx(*a, **kw)
+    except _ssl.SSLError:
+        ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
+        ctx.check_hostname = False
+        ctx.verify_mode = _ssl.CERT_NONE
+        return ctx
+_ssl.create_default_context = _safe_create_default_context
+
 DB_CONFIG = dict(host='127.0.0.1', user='root', password='root',
                  database='xiashou2', charset='utf8mb4', autocommit=True)
 

@@ -192,6 +192,7 @@ def get_scenes(rows: List[dict], path_no: str) -> List[dict]:
             continue
         scenes.append({
             "场景编号": sid,
+            "场景名称": r.get("scene_title", ""),
             "场景（对到话术、作战角色）": r.get("scene_name", ""),
             "指导角色（营销统筹/专员）": r.get("guide_role", ""),
             "作战角色": r.get("combat_role", ""),
@@ -510,6 +511,7 @@ RECORD_FIELDS = [
     ("path_name", "路径", "text"),
     ("path_target", "路径目标", "textarea"),
     ("scene_no", "场景编号", "text"),
+    ("scene_title", "场景名称", "text"),
     ("scene_name", "场景（对到话术、作战角色）", "textarea"),
     ("guide_role", "指导角色（营销统筹/专员）", "text"),
     ("combat_role", "作战角色", "text"),

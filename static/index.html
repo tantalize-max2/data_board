@@ -5,218 +5,436 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>百日攻坚"夏收"行动部署看板</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+
 *{margin:0;padding:0;box-sizing:border-box}
+
 :root{
-  --ink-red:#8B1A1A;--ink-red-light:#A63A3A;--ink-dark:#1C1C1C;--ink-mid:#3E3E3E;
-  --ink-gray:#7A7A7A;--ink-light:#C8C0B0;--paper:#F5F0E6;--paper-light:#FBF8F0;
-  --cinnabar:#C0392B;--shadow:0 3px 16px rgba(28,28,28,.10);--shadow-hover:0 8px 32px rgba(28,28,28,.18)
+  /* ---- 驾驶舱色板（明亮蓝版 v7  — 更强层次感）---- */
+  --bg-deep:#1c3f7a;
+  --bg-dark:#2860a8;
+  --bg-panel:#3888d0;
+  --bg-card:rgba(60,140,220,.85);
+  --bg-card-hover:rgba(80,160,240,.9);
+  --bg-input:rgba(40,100,180,.9);
+
+  --cyan:#38d0ff;
+  --cyan-dim:#28baee;
+  --cyan-glow:rgba(56,208,255,.24);
+  --cyan-bg:rgba(56,208,255,.12);
+  --blue:#5a9eff;
+  --blue-bright:#82c2ff;
+  --blue-glow:rgba(90,158,255,.24);
+  --blue-bg:rgba(90,158,255,.12);
+  --teal:#50ffe0;
+  --teal-dim:#28e0ba;
+  --teal-glow:rgba(80,255,224,.2);
+  --aurora:#9e8cfc;
+  --aurora-glow:rgba(158,140,252,.2);
+
+  --text-primary:#f5f9ff;
+  --text-secondary:#d8eaff;
+  --text-dim:#b8d4f0;
+  --text-accent:#38d0ff;
+
+  --border:rgba(120,200,255,.38);
+  --border-hover:rgba(140,220,255,.6);
+  --border-active:rgba(160,230,255,.8);
+  --divider:rgba(140,200,255,.18);
+
+  --glow-sm:0 0 10px rgba(80,180,255,.25);
+  --glow-md:0 0 24px rgba(80,180,255,.18);
+  --glow-lg:0 0 48px rgba(80,180,255,.1);
+  --shadow-panel:0 4px 24px rgba(0,10,40,.22);
+
+  --radius:4px;
+  --font-display:'Orbitron','Noto Sans SC',monospace;
+  --font-body:'Noto Sans SC','Microsoft YaHei',sans-serif;
 }
-body{font-family:'Noto Serif SC','Microsoft YaHei',serif;background:var(--paper);color:var(--ink-dark);line-height:1.6;overflow-x:hidden}
-body::before{content:'';position:fixed;inset:0;
-  background:url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E") repeat,
-  radial-gradient(ellipse at 10% 15%,rgba(139,26,26,.05) 0%,transparent 50%),radial-gradient(ellipse at 90% 85%,rgba(44,44,68,.04) 0%,transparent 50%);
-  pointer-events:none;z-index:0}
+
+html{font-size:14px}
+body{font-family:var(--font-body);background-color:var(--bg-deep);background-image:url('/static/background.png');background-size:cover;background-position:center center;background-repeat:no-repeat;background-attachment:fixed;color:var(--text-primary);line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* ---- 全局背景：图片蓝色遮罩（中心深→边缘透）+ 极淡网格 ---- */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse at center,rgba(18,42,90,.82) 0%,rgba(18,42,90,.68) 35%,rgba(18,42,90,.5) 70%,rgba(18,42,90,.45) 100%);
+}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    linear-gradient(rgba(0,180,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,180,255,.035) 1px,transparent 1px);
+  background-size:60px 60px;
+}
 body>*{position:relative;z-index:1}
+
 .page{display:none;min-height:100vh}
 
-/* ====== 登录页 ====== */
-.page-login{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(160deg,#0d0d1a 0%,#1a1a2e 30%,#16213e 60%,#0f2a46 100%)}
-.page-login::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 25% 35%,rgba(139,26,26,.18),transparent 55%),radial-gradient(circle at 75% 65%,rgba(44,44,68,.12),transparent 55%);pointer-events:none}
-.page-login::after{content:'';position:absolute;top:10%;left:5%;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(139,26,26,.06) 0%,transparent 70%);filter:blur(40px);pointer-events:none}
-.login-box{background:linear-gradient(170deg,var(--paper-light),var(--paper));border-radius:6px;padding:52px 44px;width:480px;box-shadow:0 24px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.4);border:1px solid rgba(139,26,26,.12);position:relative;overflow:hidden}
-.login-box::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent 5%,var(--ink-red) 30%,var(--cinnabar) 50%,var(--ink-red) 70%,transparent 95%)}
-.login-box::after{content:'夏收';position:absolute;top:20px;right:24px;font-family:'Ma Shan Zheng',serif;font-size:28px;color:var(--ink-red);opacity:.08;letter-spacing:4px;writing-mode:vertical-rl}
-.login-box h1{text-align:center;font-size:28px;color:var(--ink-red);margin-bottom:6px;font-family:'Ma Shan Zheng',serif;letter-spacing:6px}
-.login-box .sub{text-align:center;color:var(--ink-gray);font-size:13px;margin-bottom:32px;letter-spacing:3px}
-.login-box label{display:block;font-size:14px;color:var(--ink-mid);margin-bottom:6px;font-weight:700;letter-spacing:1px}
-.login-box select,.login-box input{width:100%;height:46px;border:1px solid var(--ink-light);border-radius:4px;padding:0 14px;font-size:15px;outline:none;background:#fff;font-family:inherit;transition:all .25s}
-.login-box select:focus,.login-box input:focus{border-color:var(--ink-red);box-shadow:0 0 0 3px rgba(139,26,26,.08)}
+/* ---- 科技边角装饰 ---- */
+.tech-border{position:relative;border:1px solid var(--border);border-radius:var(--radius)}
+.tech-border::before,.tech-border::after{content:'';position:absolute;width:14px;height:14px;pointer-events:none}
+.tech-border::before{top:-2px;left:-2px;border-top:2px solid var(--cyan);border-left:2px solid var(--cyan)}
+.tech-border::after{bottom:-2px;right:-2px;border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan)}
+
+/* ---- 扫描线动画 ---- */
+@keyframes scanline{0%{top:-2px}100%{top:100%}}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes glow-breathe{0%,100%{box-shadow:0 0 8px var(--cyan-glow)}50%{box-shadow:0 0 20px var(--cyan-glow),0 0 40px rgba(0,212,255,.06)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+
+/* ============================================================
+   登录页
+   ============================================================ */
+.page-login{display:flex;align-items:center;justify-content:center;min-height:100vh;
+  background:transparent}
+.page-login::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background:linear-gradient(180deg,transparent 0%,rgba(0,212,255,.02) 50%,transparent 100%);
+  animation:scanline 4s linear infinite;pointer-events:none;opacity:.4}
+
+.login-box{
+  background:linear-gradient(170deg,rgba(56,136,208,.96),rgba(40,96,168,.98));
+  border:1px solid var(--border-hover);border-radius:6px;padding:52px 44px;width:480px;
+  box-shadow:0 0 60px rgba(46,202,255,.08),0 24px 80px rgba(0,10,40,.4);
+  position:relative;overflow:hidden;
+  animation:fadeIn .6s ease-out;
+}
+.login-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),var(--blue),var(--cyan),transparent)}
+.login-box::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--aurora),var(--cyan),transparent);opacity:.5}
+
+/* 科技角 */
+.login-corner-tl,.login-corner-tr,.login-corner-bl,.login-corner-br{position:absolute;width:18px;height:18px;pointer-events:none}
+.login-corner-tl{top:-1px;left:-1px;border-top:2px solid var(--cyan);border-left:2px solid var(--cyan)}
+.login-corner-tr{top:-1px;right:-1px;border-top:2px solid var(--cyan);border-right:2px solid var(--cyan)}
+.login-corner-bl{bottom:-1px;left:-1px;border-bottom:2px solid var(--cyan);border-left:2px solid var(--cyan)}
+.login-corner-br{bottom:-1px;right:-1px;border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan)}
+
+.login-box h1{text-align:center;font-size:24px;color:var(--cyan);margin-bottom:4px;
+  font-family:var(--font-display);letter-spacing:4px;
+  text-shadow:0 0 20px var(--cyan-glow)}
+.login-box .sub{text-align:center;color:var(--text-secondary);font-size:12px;margin-bottom:32px;letter-spacing:4px}
 .login-box .field{margin-bottom:20px}
-.login-box .btn{width:100%;height:50px;background:linear-gradient(135deg,var(--ink-red),var(--cinnabar));color:#fff;border:none;border-radius:4px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:8px;transition:all .3s;position:relative;overflow:hidden}
-.login-box .btn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);transform:translateX(-100%);transition:transform .5s}
+.login-box label{display:block;font-size:12px;color:#e0f0ff;margin-bottom:6px;letter-spacing:2px;font-weight:500}
+.login-box select,.login-box input{width:100%;height:46px;border:1px solid var(--border);border-radius:var(--radius);
+  padding:0 14px;font-size:14px;outline:none;background:var(--bg-input);color:var(--text-primary);
+  font-family:inherit;transition:all .25s}
+.login-box select:focus,.login-box input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-glow);background:rgba(0,212,255,.04)}
+.login-box select option{background:var(--bg-dark);color:var(--text-primary)}
+
+.login-box .btn{width:100%;height:50px;
+  background:linear-gradient(135deg,var(--cyan-dim),var(--blue));
+  color:#fff;border:none;border-radius:var(--radius);font-size:16px;font-weight:700;
+  cursor:pointer;font-family:var(--font-display);letter-spacing:6px;
+  transition:all .3s;position:relative;overflow:hidden;
+  text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.login-box .btn::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);
+  transform:translateX(-100%);transition:transform .5s}
 .login-box .btn:hover::after{transform:translateX(100%)}
-.login-box .btn:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 6px 20px rgba(139,26,26,.3)}
-.login-box .error{color:var(--cinnabar);font-size:13px;text-align:center;margin-top:14px;min-height:20px}
+.login-box .btn:hover{box-shadow:0 0 28px var(--cyan-glow),0 4px 16px rgba(0,10,40,.3);transform:translateY(-1px)}
+.login-box .error{color:#ff4c6a;font-size:12px;text-align:center;margin-top:14px;min-height:20px;letter-spacing:1px}
 
-/* ====== 通用：标题栏 ====== */
-.header-bar{background:linear-gradient(160deg,#0d0d1a,#1a1a2e,#1C2833);padding:22px 28px;position:relative;overflow:hidden}
-.header-bar::before{content:'';position:absolute;top:-50%;left:-20%;width:140%;height:200%;background:radial-gradient(ellipse at 30% 60%,rgba(139,26,26,.1),transparent 50%);pointer-events:none}
-.header-bar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent 5%,var(--ink-red) 25%,var(--cinnabar) 50%,var(--ink-red) 75%,transparent 95%)}
-.header-inner{max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center}
-.header-title{font-family:'Ma Shan Zheng',serif;font-size:34px;color:#F0E6D8;letter-spacing:10px;text-shadow:0 0 20px rgba(139,26,26,.3),0 2px 4px rgba(0,0,0,.5)}
+/* ============================================================
+   通用：标题栏
+   ============================================================ */
+.header-bar{
+  background:linear-gradient(180deg,rgba(28,68,130,.98),rgba(22,56,110,.95));
+  padding:18px 28px;position:relative;overflow:hidden;
+  border-bottom:1px solid var(--border-hover);
+  box-shadow:0 2px 20px rgba(0,0,0,.3);
+}
+.header-bar::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent 5%,var(--cyan) 25%,var(--blue-bright) 50%,var(--cyan) 75%,transparent 95%)}
+.header-bar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan-dim),transparent);opacity:.3}
+
+.header-inner{max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1}
+
+.header-title{font-family:var(--font-display);font-size:22px;color:var(--cyan);letter-spacing:6px;
+  text-shadow:0 0 16px var(--cyan-glow);position:relative}
+.header-title::after{content:'';position:absolute;bottom:-6px;left:0;width:60px;height:2px;
+  background:linear-gradient(90deg,var(--cyan),transparent);opacity:.6}
+
 .header-user{display:flex;align-items:center;gap:10px}
-.zone-badge{padding:3px 14px;border-radius:3px;font-size:11px;color:#F0E6D8;letter-spacing:1px;border:1px solid rgba(255,255,255,.15)}
-.role-badge{padding:4px 18px;border-radius:3px;font-size:13px;font-weight:700;color:#F0E6D8;letter-spacing:1px;background:linear-gradient(135deg,rgba(139,26,26,.6),rgba(192,57,43,.5));border:1px solid rgba(139,26,26,.3)}
-.btn-logout{padding:5px 16px;border:1px solid rgba(240,230,216,.25);border-radius:3px;background:transparent;color:rgba(240,230,216,.6);cursor:pointer;font-size:12px;font-family:inherit;transition:all .25s;letter-spacing:1px}
-.btn-logout:hover{border-color:var(--cinnabar);color:var(--cinnabar)}
-.btn-admin{padding:5px 16px;border:1px solid rgba(192,57,43,.5);border-radius:3px;background:linear-gradient(135deg,rgba(139,26,26,.35),rgba(192,57,43,.25));color:#F0E6D8;cursor:pointer;font-size:12px;font-family:inherit;transition:all .25s;letter-spacing:2px;margin-right:8px;font-weight:700}
-.btn-admin:hover{background:linear-gradient(135deg,rgba(139,26,26,.6),rgba(192,57,43,.5));box-shadow:0 2px 10px rgba(139,26,26,.35);transform:translateY(-1px)}
+.zone-badge{padding:3px 14px;border-radius:3px;font-size:11px;color:var(--text-accent);letter-spacing:1px;
+  border:1px solid var(--border-hover);background:var(--cyan-bg)}
+.role-badge{padding:4px 18px;border-radius:3px;font-size:13px;font-weight:700;color:var(--text-primary);
+  letter-spacing:2px;background:linear-gradient(135deg,rgba(0,212,255,.15),rgba(46,125,255,.12));
+  border:1px solid rgba(0,212,255,.3)}
+.btn-logout{padding:5px 16px;border:1px solid rgba(0,212,255,.2);border-radius:3px;
+  background:transparent;color:var(--text-secondary);cursor:pointer;font-size:12px;
+  font-family:inherit;transition:all .25s;letter-spacing:1px}
+.btn-logout:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-sm)}
 
-/* 通用：子页面头部 */
-.sub-header{background:linear-gradient(160deg,#0d0d1a,#1a1a2e,#1C2833);padding:16px 28px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;flex-wrap:wrap}
-.sub-header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent 5%,var(--ink-red) 25%,var(--cinnabar) 50%,var(--ink-red) 75%,transparent 95%)}
-.back-btn{padding:7px 18px;border:1px solid rgba(240,230,216,.25);border-radius:3px;background:transparent;color:rgba(240,230,216,.7);cursor:pointer;font-family:inherit;font-size:13px;transition:all .25s;white-space:nowrap;letter-spacing:1px}
-.back-btn:hover{border-color:var(--cinnabar);color:var(--cinnabar)}
-.sub-title{font-family:'Ma Shan Zheng',serif;font-size:25px;color:#F0E6D8;letter-spacing:4px;text-shadow:0 0 12px rgba(139,26,26,.25)}
-.sub-title-sep{color:rgba(240,230,216,.3);font-size:18px}
-.sub-info{margin-left:auto;font-size:12px;color:rgba(240,230,216,.4);letter-spacing:1px}
+.btn-admin{padding:5px 16px;border:1px solid rgba(124,92,252,.4);border-radius:3px;
+  background:linear-gradient(135deg,rgba(124,92,252,.15),rgba(46,125,255,.1));
+  color:var(--text-primary);cursor:pointer;font-size:12px;font-family:inherit;
+  transition:all .25s;letter-spacing:2px;margin-right:8px;font-weight:700}
+.btn-admin:hover{background:linear-gradient(135deg,rgba(124,92,252,.3),rgba(46,125,255,.2));
+  box-shadow:0 0 12px var(--aurora-glow);transform:translateY(-1px)}
+
+/* ---- 通用：子页面头部 ---- */
+.sub-header{
+  background:linear-gradient(180deg,rgba(28,68,130,.98),rgba(22,56,110,.95));
+  padding:16px 28px;display:flex;align-items:center;gap:12px;position:relative;
+  overflow:hidden;flex-wrap:wrap;border-bottom:1px solid var(--border-hover);
+  box-shadow:0 2px 16px rgba(0,0,0,.2)}
+.sub-header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent 5%,var(--cyan) 25%,var(--blue-bright) 50%,var(--cyan) 75%,transparent 95%)}
+
+.back-btn{padding:7px 18px;border:1px solid rgba(0,212,255,.2);border-radius:3px;
+  background:transparent;color:var(--text-secondary);cursor:pointer;font-family:inherit;
+  font-size:13px;transition:all .25s;white-space:nowrap;letter-spacing:1px}
+.back-btn:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-sm)}
+.sub-title{font-family:var(--font-display);font-size:18px;color:var(--cyan);letter-spacing:4px;
+  text-shadow:0 0 12px var(--cyan-glow)}
+.sub-title-sep{color:var(--text-dim);font-size:16px}
+.sub-info{margin-left:auto;font-size:12px;color:var(--text-dim);letter-spacing:1px}
 .sub-body{max-width:1400px;margin:0 auto;padding:24px 28px}
 
 /* 面包屑 */
 .breadcrumb{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.breadcrumb .crumb{font-size:14px;color:rgba(240,230,216,.55);cursor:pointer;transition:color .2s;letter-spacing:1px}
-.breadcrumb .crumb:hover{color:rgba(240,230,216,.9)}
-.breadcrumb .crumb.active{color:#F0E6D8;font-weight:700;cursor:default}
-.breadcrumb .sep{color:rgba(240,230,216,.25);font-size:10px}
+.breadcrumb .crumb{font-size:13px;color:var(--text-dim);cursor:pointer;transition:color .2s;letter-spacing:1px}
+.breadcrumb .crumb:hover{color:var(--cyan)}
+.breadcrumb .crumb.active{color:var(--cyan);font-weight:700;cursor:default;text-shadow:0 0 8px var(--cyan-glow)}
+.breadcrumb .sep{color:var(--text-dim);font-size:10px;opacity:.4}
 
-/* ====== 主页 ====== */
-.main-body{max-width:1400px;margin:0 auto;padding:32px 28px}
-.section-label{font-size:16px;font-weight:700;color:var(--ink-red);margin-bottom:14px;padding-left:12px;border-left:4px solid var(--ink-red);letter-spacing:3px;position:relative}
-.section-label::after{content:'';position:absolute;left:-7px;top:50%;width:10px;height:10px;border-radius:50%;background:var(--ink-red);opacity:.3;transform:translateY(-50%)}
+/* ============================================================
+   主页
+   ============================================================ */
+.main-body{max-width:1400px;margin:0 auto;padding:28px}
 
-/* 战役/战区 通用卡片网格 */
-.card-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:36px}
-.card-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:36px}
+.section-label{font-size:14px;font-weight:700;color:var(--cyan);margin-bottom:14px;
+  padding-left:14px;border-left:3px solid var(--cyan);letter-spacing:4px;position:relative;
+  text-shadow:0 0 8px var(--cyan-glow)}
+.section-label::before{content:'';position:absolute;left:-8px;top:50%;width:8px;height:8px;
+  transform:translateY(-50%) rotate(45deg);background:var(--cyan);opacity:.3;
+  box-shadow:0 0 6px var(--cyan-glow)}
 
-.card-item{background:linear-gradient(170deg,#fff,var(--paper-light));border-radius:4px;padding:26px 22px;cursor:pointer;transition:all .35s;position:relative;overflow:hidden;border:1px solid var(--ink-light);box-shadow:var(--shadow)}
-.card-item::before{content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;border-radius:5px;background:linear-gradient(135deg,transparent 40%,var(--ink-red) 50%,transparent 60%);opacity:0;transition:opacity .35s;z-index:-1}
-.card-item:hover{transform:translateY(-5px);box-shadow:var(--shadow-hover);border-color:var(--ink-red)}
-.card-item:hover::before{opacity:.15}
-.card-item::after{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,transparent,var(--ink-red),transparent);opacity:.5;transition:opacity .3s}
-.card-item:hover::after{opacity:.9}
-.card-item .card-name{font-size:20px;font-weight:700;letter-spacing:4px;margin-bottom:8px;padding-left:8px}
-.card-item .card-count{font-size:13px;color:var(--ink-gray);padding-left:8px}
-.card-item .card-arrow{position:absolute;right:20px;top:50%;transform:translateY(-50%);font-size:20px;opacity:.2;transition:all .3s;color:var(--ink-red)}
-.card-item:hover .card-arrow{opacity:.6;right:16px}
+/* ---- 战役/战区 通用卡片网格 ---- */
+.card-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+.card-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+
+.card-item{
+  background:var(--bg-card);
+  border:1px solid var(--border-hover);border-radius:var(--radius);padding:24px 20px;
+  cursor:pointer;transition:all .35s;position:relative;overflow:hidden}
+.card-item::before{content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;
+  border-radius:5px;
+  background:linear-gradient(135deg,transparent 30%,var(--cyan) 50%,transparent 70%);
+  opacity:0;transition:opacity .35s;z-index:-1}
+.card-item:hover{transform:translateY(-4px);border-color:var(--border-hover);
+  box-shadow:0 0 24px var(--cyan-glow),0 8px 32px rgba(0,0,0,.3)}
+.card-item:hover::before{opacity:.12}
+.card-item::after{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:linear-gradient(180deg,transparent,var(--cyan),transparent);opacity:.4;transition:opacity .3s}
+.card-item:hover::after{opacity:1}
+
+.card-item .card-name{font-size:18px;font-weight:700;letter-spacing:3px;margin-bottom:6px;padding-left:8px;
+  text-shadow:0 0 12px currentColor,0 1px 3px rgba(0,0,0,.5)}
+.card-item .card-count{font-size:12px;color:var(--cyan);padding-left:8px;letter-spacing:1px;
+  text-shadow:0 0 8px var(--cyan-glow),0 1px 2px rgba(0,0,0,.4)}
+.card-item .card-arrow{position:absolute;right:18px;top:50%;transform:translateY(-50%);
+  font-size:18px;opacity:.2;transition:all .3s;color:var(--cyan)}
+.card-item:hover .card-arrow{opacity:.7;right:14px;text-shadow:0 0 8px var(--cyan-glow)}
 
 /* 战区型卡片（居中无箭头） */
-.card-center{text-align:center;padding:30px 20px}
-.card-center .card-name{font-size:20px;font-weight:700;letter-spacing:5px;margin-bottom:8px;padding-left:0}
-.card-center .card-count{padding-left:0}
+.card-center{text-align:center;padding:28px 20px}
+.card-center .card-name{font-size:18px;font-weight:700;letter-spacing:4px;margin-bottom:6px;padding-left:0;
+  text-shadow:0 0 12px currentColor,0 1px 3px rgba(0,0,0,.5)}
+.card-center .card-count{padding-left:0;color:var(--cyan);
+  text-shadow:0 0 8px var(--cyan-glow),0 1px 2px rgba(0,0,0,.4)}
 .card-center::after{display:none}
-.card-center::before-extra{content:''}
 
-/* 兵种区 */
-.troop-overview{background:linear-gradient(170deg,rgba(139,26,26,.04),rgba(139,26,26,.02));border:1px solid rgba(139,26,26,.10);border-radius:4px;padding:20px 24px;margin-bottom:28px;position:relative;overflow:hidden}
-.troop-overview::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(139,26,26,.05),transparent 70%);pointer-events:none}
-.troop-overview .label{font-weight:700;font-size:14px;color:var(--ink-red);margin-bottom:12px;letter-spacing:3px;padding-left:10px;border-left:3px solid var(--ink-red)}
-.troop-zones-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-.troop-zone-group .tz-name{font-size:13px;font-weight:700;margin-bottom:8px;letter-spacing:2px;padding-bottom:4px;border-bottom:1px solid rgba(0,0,0,.06)}
+/* ---- 兵种区 ---- */
+.troop-overview{
+  background:linear-gradient(170deg,rgba(0,212,255,.04),rgba(46,125,255,.02));
+  border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;
+  margin-bottom:28px;position:relative;overflow:hidden;
+  box-shadow:var(--glow-sm)}
+.troop-overview::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;
+  border-radius:50%;background:radial-gradient(circle,var(--cyan-glow),transparent 70%);pointer-events:none;opacity:.3}
+.troop-overview .label{font-weight:700;font-size:13px;color:var(--cyan);margin-bottom:12px;
+  letter-spacing:3px;padding-left:10px;border-left:3px solid var(--cyan)}
+.troop-zones-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.troop-zone-group .tz-name{font-size:13px;font-weight:700;margin-bottom:8px;letter-spacing:2px;
+  padding-bottom:4px;border-bottom:1px solid var(--divider)}
 .troop-zone-group .tz-roles{display:flex;flex-wrap:wrap;gap:6px}
-.tz-tag{padding:5px 14px;border-radius:3px;font-size:12px;background:var(--paper-light);border:1px solid var(--ink-light);color:var(--ink-mid);cursor:default;transition:all .25s;font-family:inherit;font-weight:500;letter-spacing:1px}
-.tz-tag.is-me{color:#F0E6D8;font-weight:700;border-color:transparent;background:linear-gradient(135deg,var(--ink-red),var(--cinnabar));box-shadow:0 2px 8px rgba(139,26,26,.2)}
 
-/* 标语 */
-.motto-section{text-align:center;padding:28px 24px;margin:20px 0;position:relative}
-.motto-section::before,.motto-section::after{content:'';position:absolute;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,rgba(139,26,26,.2),transparent)}
-.motto-section::before{top:0}.motto-section::after{bottom:0}
-.motto-text{font-family:'Ma Shan Zheng',serif;color:var(--ink-red);font-size:22px;letter-spacing:6px;opacity:.7}
-.motto-sub{font-family:'Ma Shan Zheng',serif;color:var(--ink-gray);font-size:16px;letter-spacing:4px;opacity:.5;margin-top:8px}
-
-/* 检索框 */
-.search-section{display:flex;gap:12px;margin-bottom:28px}
-.search-input{flex:1;height:46px;border:1px solid var(--ink-red);border-radius:4px;padding:0 18px;font-size:15px;outline:none;background:#fff;font-family:inherit;box-shadow:0 2px 8px rgba(139,26,26,.08)}
-.search-input:focus{border-color:var(--cinnabar);box-shadow:0 0 0 3px rgba(139,26,26,.1)}
-.search-btn{height:46px;padding:0 32px;background:linear-gradient(135deg,var(--ink-red),var(--cinnabar));color:#fff;border:none;border-radius:4px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:6px;transition:all .25s}
-.search-btn:hover{filter:brightness(1.1);box-shadow:0 4px 14px rgba(139,26,26,.35)}
-
-/* 兵种标签可点击态（总经理） */
+.tz-tag{padding:4px 14px;border-radius:3px;font-size:11px;
+  background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary);
+  cursor:default;transition:all .25s;font-family:inherit;font-weight:500;letter-spacing:1px}
+.tz-tag.is-me{color:#fff;font-weight:700;border-color:transparent;
+  background:linear-gradient(135deg,var(--cyan-dim),var(--blue));
+  box-shadow:0 0 10px var(--cyan-glow)}
 .tz-tag.clickable{cursor:pointer}
-.tz-tag.clickable:hover{background:rgba(139,26,26,.08);border-color:var(--ink-red);color:var(--ink-red);transform:translateY(-1px)}
+.tz-tag.clickable:hover{background:rgba(0,212,255,.1);border-color:var(--cyan);color:var(--cyan);
+  box-shadow:var(--glow-sm);transform:translateY(-1px)}
 
-/* 通用弹窗 */
-.modal-mask{position:fixed;inset:0;background:rgba(13,13,26,.55);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
-.modal-mask.show{display:flex}
-.modal-box{background:linear-gradient(170deg,var(--paper-light),var(--paper));border-radius:6px;width:100%;max-width:760px;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.45);border:1px solid rgba(139,26,26,.15);overflow:hidden}
+/* ---- 标语 ---- */
+.motto-section{text-align:center;padding:28px 24px;margin:20px 0;position:relative}
+.motto-section::before,.motto-section::after{content:'';position:absolute;left:10%;right:10%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.2),transparent)}
+.motto-section::before{top:0}.motto-section::after{bottom:0}
+.motto-text{font-family:var(--font-display);color:var(--cyan);font-size:18px;letter-spacing:6px;opacity:.85;
+  text-shadow:0 0 12px var(--cyan-glow)}
+.motto-sub{color:var(--text-secondary);font-size:14px;letter-spacing:4px;opacity:.7;margin-top:8px}
+
+/* ---- 检索框 ---- */
+.search-section{display:flex;gap:12px;margin-bottom:28px}
+.search-input{flex:1;height:46px;border:1px solid var(--border);border-radius:var(--radius);
+  padding:0 18px;font-size:14px;outline:none;background:var(--bg-input);color:var(--text-primary);
+  font-family:inherit;transition:all .25s}
+.search-input::placeholder{color:var(--text-secondary)}
+.search-input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-glow);background:rgba(0,212,255,.04)}
+.search-btn{height:46px;padding:0 32px;
+  background:linear-gradient(135deg,var(--cyan-dim),var(--blue));color:#fff;
+  border:none;border-radius:var(--radius);font-size:14px;font-weight:700;
+  cursor:pointer;font-family:var(--font-display);letter-spacing:4px;transition:all .25s;
+  text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.search-btn:hover{box-shadow:0 0 20px var(--cyan-glow);filter:brightness(1.1);transform:translateY(-1px)}
+
+/* ---- 通用弹窗 ---- */
+.modal-mask{position:fixed;inset:0;background:rgba(10,20,50,.6);backdrop-filter:blur(4px);
+  display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal-mask.show{display:flex;animation:fadeIn .2s}
+.modal-box{background:linear-gradient(170deg,var(--bg-panel),var(--bg-dark));
+  border:1px solid var(--border-hover);border-radius:6px;width:100%;max-width:760px;
+  max-height:84vh;display:flex;flex-direction:column;
+  box-shadow:0 0 60px rgba(0,212,255,.06),0 24px 80px rgba(0,0,0,.4);overflow:hidden;
+  position:relative}
 .modal-box.small{max-width:520px}
-.modal-header{padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(139,26,26,.12);background:linear-gradient(180deg,var(--paper-dark),transparent)}
-.modal-header h3{font-family:'Ma Shan Zheng',serif;font-size:22px;color:var(--ink-red);letter-spacing:4px}
-.modal-close{width:30px;height:30px;border:none;background:transparent;font-size:22px;color:var(--ink-gray);cursor:pointer;border-radius:3px;transition:all .2s;line-height:1}
-.modal-close:hover{background:rgba(192,57,43,.1);color:var(--cinnabar)}
+.modal-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),var(--blue),var(--cyan),transparent)}
+
+.modal-header{padding:16px 22px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border)}
+.modal-header h3{font-family:var(--font-display);font-size:16px;color:var(--cyan);letter-spacing:3px}
+.modal-close{width:28px;height:28px;border:1px solid var(--border);background:transparent;
+  font-size:18px;color:var(--text-dim);cursor:pointer;border-radius:3px;transition:all .2s;line-height:1}
+.modal-close:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-sm)}
 .modal-body{padding:20px 22px;overflow-y:auto;flex:1}
 .modal-body .empty-state{padding:30px}
 
 /* 检索结果条目 */
-.result-item{background:#fff;border:1px solid var(--ink-light);border-left:4px solid var(--ink-red);border-radius:3px;padding:14px 18px;margin-bottom:10px;cursor:pointer;transition:all .25s}
-.result-item:hover{box-shadow:0 4px 16px rgba(28,28,28,.1);transform:translateX(3px);border-left-color:var(--cinnabar)}
-.result-item .ri-title{font-weight:900;color:var(--ink-dark);font-size:15px;margin-bottom:4px;letter-spacing:1px}
-.result-item .ri-meta{font-size:12px;color:var(--ink-gray);display:flex;gap:14px;flex-wrap:wrap}
-.result-item .ri-meta b{color:var(--ink-red);font-weight:700}
+.result-item{background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--cyan);
+  border-radius:3px;padding:14px 18px;margin-bottom:8px;cursor:pointer;transition:all .25s}
+.result-item:hover{border-left-color:var(--blue-bright);background:var(--bg-card-hover);
+  box-shadow:0 0 12px var(--cyan-glow);transform:translateX(3px)}
+.result-item.active{border-left-color:var(--blue-bright);background:linear-gradient(90deg,rgba(0,212,255,.08),transparent)}
+.result-item .ri-title{font-weight:700;color:var(--text-primary);font-size:14px;margin-bottom:4px;letter-spacing:1px}
+.result-item .ri-meta{font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap}
+.result-item .ri-meta b{color:var(--cyan);font-weight:700}
 
-/* 检索侧边抽屉 */
-.search-drawer{position:fixed;top:0;right:-420px;width:400px;height:100vh;background:linear-gradient(180deg,var(--paper-light),var(--paper));box-shadow:-8px 0 40px rgba(0,0,0,.2);z-index:999;transition:right .3s ease;display:flex;flex-direction:column;border-left:3px solid var(--ink-red)}
+/* ---- 检索侧边抽屉 ---- */
+.search-drawer{position:fixed;top:0;right:-420px;width:400px;height:100vh;
+  background:linear-gradient(180deg,var(--bg-panel),var(--bg-dark));
+  box-shadow:-8px 0 40px rgba(0,0,0,.3),0 0 20px var(--cyan-glow);z-index:999;
+  transition:right .3s ease;display:flex;flex-direction:column;
+  border-left:2px solid var(--cyan-dim)}
 .search-drawer.show{right:0}
-.search-drawer .drawer-header{padding:16px 20px;background:linear-gradient(160deg,#0d0d1a,#1a1a2e);color:#F0E6D8;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.search-drawer .drawer-header h3{font-family:'Ma Shan Zheng',serif;font-size:20px;letter-spacing:4px}
-.search-drawer .drawer-close{width:28px;height:28px;border:1px solid rgba(240,230,216,.25);background:transparent;color:rgba(240,230,216,.7);font-size:18px;cursor:pointer;border-radius:3px;transition:all .2s;line-height:1}
-.search-drawer .drawer-close:hover{border-color:var(--cinnabar);color:var(--cinnabar)}
-.search-drawer .drawer-count{padding:10px 20px;font-size:12px;color:var(--ink-gray);letter-spacing:1px;border-bottom:1px solid var(--line);background:var(--paper-dark);flex-shrink:0}
+.search-drawer .drawer-header{padding:16px 20px;
+  background:linear-gradient(180deg,rgba(28,68,130,.98),rgba(22,56,110,.95));
+  color:var(--text-primary);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+  border-bottom:1px solid var(--border)}
+.search-drawer .drawer-header h3{font-family:var(--font-display);font-size:14px;color:var(--cyan);letter-spacing:3px}
+.search-drawer .drawer-close{width:28px;height:28px;border:1px solid var(--border);
+  background:transparent;color:var(--text-secondary);font-size:16px;cursor:pointer;
+  border-radius:3px;transition:all .2s;line-height:1}
+.search-drawer .drawer-close:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-sm)}
+.search-drawer .drawer-count{padding:10px 20px;font-size:11px;color:var(--text-dim);letter-spacing:1px;
+  border-bottom:1px solid var(--divider);background:rgba(0,212,255,.02);flex-shrink:0}
 .search-drawer .drawer-body{flex:1;overflow-y:auto;padding:12px 16px}
-.search-drawer .result-item{margin-bottom:8px}
-.search-drawer .result-item.active{border-left-color:var(--cinnabar);background:linear-gradient(90deg,rgba(192,57,43,.06),transparent)}
 
-/* 权限矩阵（弹窗内简版） */
+/* 权限矩阵 */
 .am-table{border-collapse:collapse;width:100%;margin-top:8px}
-.am-table th,.am-table td{padding:8px 6px;text-align:center;border:1px solid rgba(28,28,28,.08);font-size:12px}
-.am-table th{background:var(--paper-dark);color:var(--ink-mid);font-weight:700;letter-spacing:1px}
-.am-table td.yes{background:rgba(139,26,26,.1);color:var(--ink-red);font-weight:900}
-.am-table td.no{color:var(--ink-light)}
+.am-table th,.am-table td{padding:8px 6px;text-align:center;border:1px solid var(--divider);font-size:12px}
+.am-table th{background:var(--bg-card);color:var(--text-secondary);font-weight:700;letter-spacing:1px}
+.am-table td.yes{background:rgba(0,212,255,.1);color:var(--cyan);font-weight:900}
+.am-table td.no{color:var(--text-dim)}
 
-/* ====== 层级模块 ====== */
+/* ============================================================
+   层级模块
+   ============================================================ */
 .module-section{margin-bottom:28px}
-.module-title{font-size:15px;font-weight:700;color:var(--ink-red);margin-bottom:14px;padding-left:12px;border-left:4px solid var(--ink-red);letter-spacing:3px;position:relative}
-.module-title::after{content:'';position:absolute;left:-7px;top:50%;width:10px;height:10px;border-radius:50%;background:var(--ink-red);opacity:.3;transform:translateY(-50%)}
+.module-title{font-size:14px;font-weight:700;color:var(--cyan);margin-bottom:14px;
+  padding-left:12px;border-left:3px solid var(--cyan);letter-spacing:3px;position:relative;
+  text-shadow:0 0 8px var(--cyan-glow)}
+.module-title::before{content:'';position:absolute;left:-8px;top:50%;width:8px;height:8px;
+  transform:translateY(-50%) rotate(45deg);background:var(--cyan);opacity:.3}
 
 /* 信息卡片 */
-.info-card{background:linear-gradient(170deg,#fff,var(--paper-light));border-radius:4px;border:1px solid rgba(200,192,176,.6);box-shadow:0 2px 8px rgba(28,28,28,.05);overflow:hidden;position:relative}
-.info-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ink-red),var(--cinnabar),var(--ink-red));opacity:.4}
+.info-card{background:var(--bg-card);
+  border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow-panel);overflow:hidden;position:relative}
+.info-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue),var(--cyan));opacity:.5}
 .card-fields{padding:16px 20px 12px}
-.field-row{display:flex;align-items:flex-start;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.03)}
+.field-row{display:flex;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--divider)}
 .field-row:last-child{border-bottom:none}
-.field-label{flex-shrink:0;width:140px;font-size:13px;color:var(--ink-mid);font-weight:900;letter-spacing:1px;padding-top:2px}
-.field-label::after{content:'';display:inline-block;width:3px;height:14px;margin-left:8px;vertical-align:middle;background:linear-gradient(180deg,transparent 5%,rgba(139,26,26,.5) 50%,transparent 95%);border-radius:2px;box-shadow:0 0 4px rgba(139,26,26,.15)}
-.field-value{flex:1;font-size:15px;color:var(--ink-dark);font-weight:900;line-height:1.7;word-break:break-all;letter-spacing:.5px}
-.field-value.empty{color:var(--ink-light);font-style:italic;font-weight:400}
+.field-label{flex-shrink:0;width:140px;font-size:12px;color:var(--text-secondary);font-weight:700;
+  letter-spacing:1px;padding-top:2px}
+.field-label::after{content:'';display:inline-block;width:3px;height:12px;margin-left:8px;
+  vertical-align:middle;background:linear-gradient(180deg,transparent,var(--cyan),transparent);
+  opacity:.5;border-radius:2px}
+.field-value{flex:1;font-size:14px;color:var(--text-primary);font-weight:700;line-height:1.7;
+  word-break:break-all;letter-spacing:.5px}
+.field-value.empty{color:var(--text-dim);font-style:italic;font-weight:400}
 
 /* 路径卡片 */
-.path-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
-.path-card{background:linear-gradient(170deg,#fff,var(--paper-light));border-radius:4px;border:1px solid rgba(200,192,176,.6);box-shadow:0 2px 8px rgba(28,28,28,.05);padding:20px 22px;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
-.path-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ink-red),var(--cinnabar),var(--ink-red));opacity:.4;transition:opacity .3s}
-.path-card:hover{box-shadow:0 6px 20px rgba(28,28,28,.1);transform:translateY(-2px);border-color:rgba(139,26,26,.2)}
-.path-card:hover::before{opacity:.8}
-.path-card .path-name{font-size:17px;font-weight:900;color:var(--ink-dark);letter-spacing:2px;margin-bottom:6px}
-.path-card .path-target{font-size:13px;color:var(--ink-gray);margin-bottom:8px}
+.path-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.path-card{background:var(--bg-card);
+  border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow-panel);padding:20px 22px;cursor:pointer;transition:all .3s;
+  position:relative;overflow:hidden}
+.path-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue),var(--cyan));opacity:.5;transition:opacity .3s}
+.path-card:hover{border-color:var(--border-hover);
+  box-shadow:0 0 20px var(--cyan-glow),0 6px 20px rgba(0,0,0,.2);transform:translateY(-2px)}
+.path-card:hover::before{opacity:1}
+.path-card .path-name{font-size:16px;font-weight:900;color:var(--text-primary);letter-spacing:2px;margin-bottom:6px}
+.path-card .path-target{font-size:12px;color:var(--text-dim);margin-bottom:8px}
 .path-card .path-meta{display:flex;align-items:center;justify-content:space-between}
-.path-card .path-id{font-size:12px;color:var(--ink-gray);letter-spacing:1px}
-.path-card .path-scenes{font-size:12px;color:var(--ink-red);font-weight:700;letter-spacing:1px}
-.path-card .path-arrow{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:16px;opacity:.2;color:var(--ink-red);transition:all .3s}
-.path-card:hover .path-arrow{opacity:.6;right:12px}
+.path-card .path-id{font-size:11px;color:var(--text-dim);letter-spacing:1px}
+.path-card .path-scenes{font-size:12px;color:var(--cyan);font-weight:700;letter-spacing:1px;
+  text-shadow:0 0 6px var(--cyan-glow)}
+.path-card .path-arrow{position:absolute;right:16px;top:50%;transform:translateY(-50%);
+  font-size:16px;opacity:.2;color:var(--cyan);transition:all .3s}
+.path-card:hover .path-arrow{opacity:.6;right:12px;text-shadow:0 0 8px var(--cyan-glow)}
 
 /* 场景卡片 */
-.scene-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px}
-.scene-card{background:linear-gradient(170deg,#fff,var(--paper-light));border-radius:4px;border:1px solid rgba(200,192,176,.6);box-shadow:0 2px 8px rgba(28,28,28,.05);overflow:hidden;position:relative;transition:all .3s}
-.scene-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ink-red),var(--cinnabar),var(--ink-red));opacity:.4}
-.scene-card:hover{box-shadow:0 6px 20px rgba(28,28,28,.1);transform:translateY(-2px)}
-.scene-card .scene-header{padding:16px 20px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(0,0,0,.04)}
-.scene-card .scene-id{font-family:'Ma Shan Zheng',serif;font-size:28px;color:var(--ink-red);opacity:.15;line-height:1}
-.scene-card .scene-name{font-size:16px;font-weight:900;color:var(--ink-dark);letter-spacing:1px;flex:1}
+.scene-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:14px}
+.scene-card{background:var(--bg-card);
+  border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow-panel);overflow:hidden;position:relative;transition:all .3s}
+.scene-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue),var(--cyan));opacity:.5}
+.scene-card:hover{border-color:var(--border-hover);
+  box-shadow:0 0 20px var(--cyan-glow),0 6px 20px rgba(0,0,0,.2);transform:translateY(-2px)}
+.scene-card .scene-header{padding:14px 20px 6px;display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--divider)}
+.scene-card .scene-id{font-family:var(--font-display);font-size:24px;color:var(--cyan);
+  opacity:.15;line-height:1}
+.scene-card .scene-name{font-size:15px;font-weight:900;color:var(--text-primary);letter-spacing:1px;flex:1}
 .scene-card .scene-fields{padding:12px 20px 16px}
 .scene-card .field-label{width:160px}
 
-.empty-state{text-align:center;padding:60px 20px;color:var(--ink-light);font-size:15px;letter-spacing:3px}
-.loading{text-align:center;padding:40px;color:var(--ink-gray);font-size:14px;letter-spacing:1px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-dim);font-size:14px;letter-spacing:3px}
+.loading{text-align:center;padding:40px;color:var(--text-dim);font-size:13px;letter-spacing:1px}
 
-/* 响应式 */
+/* ---- 响应式 ---- */
 @media(max-width:1100px){.path-grid{grid-template-columns:minmax(300px,1fr)}.scene-grid{grid-template-columns:minmax(340px,1fr)}}
 @media(max-width:900px){
   .card-grid-3{grid-template-columns:repeat(2,1fr)}.card-grid-4{grid-template-columns:repeat(2,1fr)}.troop-zones-grid{grid-template-columns:repeat(2,1fr)}
-  .header-title{font-size:24px;letter-spacing:5px}.path-grid,.scene-grid{grid-template-columns:1fr}
+  .header-title{font-size:16px;letter-spacing:3px}.path-grid,.scene-grid{grid-template-columns:1fr}
   .field-label{width:110px}.scene-card .field-label{width:130px}
 }
 @media(max-width:600px){
   .card-grid-3,.card-grid-4,.troop-zones-grid{grid-template-columns:1fr}
-  .header-title{font-size:18px;letter-spacing:3px}.header-inner{flex-direction:column;gap:10px}
+  .header-title{font-size:14px;letter-spacing:2px}.header-inner{flex-direction:column;gap:10px}
   .path-grid,.scene-grid{grid-template-columns:1fr}
   .field-row{flex-direction:column}.field-label{width:auto;margin-bottom:2px}
   .scene-card .field-row{flex-direction:column}.scene-card .field-label{width:auto}
@@ -229,11 +447,13 @@ body>*{position:relative;z-index:1}
 <!-- 登录页 -->
 <div class="page page-login" id="pageLogin">
   <div class="login-box">
-    <h1>百日攻坚"夏收"行动</h1>
-    <div class="sub">行动部署看板 · 权限控制</div>
-    <div class="field"><label>选择角色</label><select id="selRole"></select></div>
-    <div class="field"><label>输入密码</label><input type="password" id="txtPwd" placeholder="请输入密码"></div>
-    <button class="btn" onclick="doLogin()">进 入</button>
+    <span class="login-corner-tl"></span><span class="login-corner-tr"></span>
+    <span class="login-corner-bl"></span><span class="login-corner-br"></span>
+    <h1>夏收行动</h1>
+    <div class="sub">HARVEST OPERATION · DEPLOYMENT DASHBOARD</div>
+    <div class="field"><label>选择角色 / SELECT ROLE</label><select id="selRole"></select></div>
+    <div class="field"><label>输入密码 / PASSWORD</label><input type="password" id="txtPwd" placeholder="请输入密码"></div>
+    <button class="btn" onclick="doLogin()">A C C E S S</button>
     <div class="error" id="loginErr"></div>
   </div>
 </div>
@@ -241,17 +461,17 @@ body>*{position:relative;z-index:1}
 <!-- 主页 -->
 <div class="page page-main" id="pageMain">
   <div class="header-bar"><div class="header-inner">
-    <div class="header-title">百日攻坚"夏收"行动部署看板</div>
+    <div class="header-title">夏收行动部署看板</div>
     <div class="header-user"><span class="zone-badge" id="mainZoneBadge"></span><span class="role-badge" id="mainRoleBadge"></span><button class="btn-admin" id="btnAdmin" style="display:none" onclick="openAdmin()">管理后台</button><button class="btn-logout" onclick="doLogout()">退出</button></div>
   </div></div>
   <div class="main-body">
     <div class="search-section" id="searchSection" style="display:none">
       <input class="search-input" id="guideSearch" placeholder="检索指导角色 / 作战角色（如：张三）" onkeydown="if(event.key==='Enter')doSearch()">
-      <button class="search-btn" onclick="doSearch()">检 索</button>
+      <button class="search-btn" onclick="doSearch()">SEARCH</button>
     </div>
-    <div class="section-label">六大战役</div><div class="card-grid-3" id="mainBattleGrid"></div>
-    <div id="zoneSection"><div class="section-label">四大战区</div><div class="card-grid-4" id="mainZoneGrid"></div></div>
-    <div class="troop-overview"><div class="label" id="troopLabel">兵种</div><div class="troop-zones-grid" id="mainTroopZones"></div></div>
+    <div class="section-label">六大战役 / BATTLES</div><div class="card-grid-3" id="mainBattleGrid"></div>
+    <div id="zoneSection"><div class="section-label">四大战区 / WARZONES</div><div class="card-grid-4" id="mainZoneGrid"></div></div>
+    <div class="troop-overview"><div class="label" id="troopLabel">兵种 / TROOPS</div><div class="troop-zones-grid" id="mainTroopZones"></div></div>
     <div class="motto-section"><div class="motto-text">以"商机+标准化"为灵魂</div><div class="motto-sub">扎硬寨，打呆仗，走笨路，用凡人，要巧思，需新为</div></div>
   </div>
 </div>
@@ -310,15 +530,26 @@ let TOKEN='',ROLE=null;
       groups[g].forEach(r=>{const o=document.createElement('option');o.value=r.id;o.text=r.name;og.appendChild(o);});sel.appendChild(og);
     });
   }catch(e){sel.innerHTML='<option>角色加载失败</option>'}
+  /* 检测 URL token 参数（从管理后台返回时），自动恢复会话进入主页 */
+  const urlToken=new URLSearchParams(location.search).get('token');
+  if(urlToken){
+    try{
+      const meRes=await fetch('/api/me?token='+encodeURIComponent(urlToken));
+      if(meRes.ok){
+        const meData=await meRes.json();
+        TOKEN=urlToken;ROLE=meData;
+        history.replaceState(null,'','/');
+        showPage('main');loadMainPage();
+      }
+    }catch(e){}
+  }
 })();
 document.getElementById('txtPwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
 function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.style.display='none');
-  // 将name转为驼峰：battle-zones → BattleZones
   const camel='page'+name.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()).replace(/^./,s=>s.toUpperCase());
   const el=document.getElementById(camel);
-  // 登录页用 flex 居中，其余页面用 block（修复退出后登录框塌缩到左上角）
   if(el) el.style.display=(name==='login')?'flex':'block';
   window.scrollTo(0,0);
 }
@@ -343,14 +574,14 @@ async function doLogout(){
 /* ====== 主页 ====== */
 async function loadMainPage(){
   document.getElementById('mainRoleBadge').textContent=ROLE.name;
-  document.getElementById('mainRoleBadge').style.background='linear-gradient(135deg,rgba(139,26,26,.6),rgba(192,57,43,.5))';
+  document.getElementById('mainRoleBadge').style.background='linear-gradient(135deg,rgba(0,212,255,.15),rgba(46,125,255,.12))';
   document.getElementById('mainZoneBadge').textContent=ROLE.zone_name;
   document.getElementById('mainZoneBadge').style.background=ROLE.color+'44';
   const isAdmin=!!ROLE.is_admin;
   document.getElementById('btnAdmin').style.display=isAdmin?'inline-block':'none';
   document.getElementById('searchSection').style.display=isAdmin?'flex':'none';
   document.getElementById('zoneSection').style.display=isAdmin?'block':'none';
-  document.getElementById('troopLabel').textContent=isAdmin?'兵种':'我的战区 · 兵种';
+  document.getElementById('troopLabel').textContent=isAdmin?'兵种 / TROOPS':'我的战区 · 兵种';
   try{
     const res=await fetch('/api/overview?token='+TOKEN);
     if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
@@ -364,22 +595,26 @@ async function loadMainPage(){
 function renderBattleGrid(battles){
   const isAdmin=!!ROLE.is_admin;
   let h='';battles.forEach(b=>{
-    // 总经理：选战区；普通角色：直接进详情（用自身战区）
     const click=isAdmin?`openBattleZones('${b.id}')`:`openDetail('${b.id}','${ROLE.zone}')`;
-    h+=`<div class="card-item" onclick="${click}"><div class="card-name" style="color:${b.color}">${esc(b.name)}</div><div class="card-count">${b.count}条数据</div><div class="card-arrow">&#10095;</div></div>`;
+    h+=`<div class="card-item" onclick="${click}"><div class="card-name" style="color:${mapBattleColor(b.color)}">${esc(b.name)}</div><div class="card-count">${b.count}条数据</div><div class="card-arrow">&#10095;</div></div>`;
   });if(!h)h='<div class="empty-state">暂无相关战役数据</div>';
   document.getElementById('mainBattleGrid').innerHTML=h;
 }
 
+/* 将原始暖色系颜色映射为亮色系（确保在蓝卡片上可读） */
+function mapBattleColor(c){
+  const m={'#8B1A1A':'#00e8ff','#C0392B':'#90d4ff','#A63A3A':'#c8b8ff','#2E7D32':'#40ffd8'};
+  return m[c]||'#00e8ff';
+}
+
 function renderZoneGrid(zones){
   let h='';zones.forEach(z=>{
-    h+=`<div class="card-item card-center" onclick="openZoneBattles('${z.id}')"><div class="card-name" style="color:${z.color}">${esc(z.name)}</div><div class="card-count">${z.count}条数据</div></div>`;
+    h+=`<div class="card-item card-center" onclick="openZoneBattles('${z.id}')"><div class="card-name" style="color:${mapBattleColor(z.color)}">${esc(z.name)}</div><div class="card-count">${z.count}条数据</div></div>`;
   });document.getElementById('mainZoneGrid').innerHTML=h;
 }
 
 function renderTroopOverview(zones){
   const isAdmin=!!ROLE.is_admin;
-  // 分局长/客户经理可点击本战区兵种查看其战役
   const isZoneManager=!isAdmin && (ROLE.role_name||'').match(/分局长|客户经理/);
   const canClick=isAdmin||isZoneManager;
   let h='';zones.forEach(z=>{
@@ -389,7 +624,7 @@ function renderTroopOverview(zones){
       const click=canClick?` onclick="showRoleBattles('${esc(r)}')"`:'';
       const title=canClick?('点击查看'+esc(r)+'的战役信息'):'';
       tags+=`<span class="${cls}"${click} title="${title}">${esc(r)}</span>`;
-    });h+=`<div class="troop-zone-group"><div class="tz-name" style="color:${z.color}">${esc(z.name)}</div><div class="tz-roles">${tags}</div></div>`;
+    });h+=`<div class="troop-zone-group"><div class="tz-name" style="color:${mapBattleColor(z.color)}">${esc(z.name)}</div><div class="tz-roles">${tags}</div></div>`;
   });document.getElementById('mainTroopZones').innerHTML=h;
 }
 
@@ -405,10 +640,10 @@ async function openBattleZones(bid){
     const data=await res.json();
     document.getElementById('bzTitle').textContent=data.battle.name;
     document.getElementById('bzInfo').textContent='共'+data.total+'条数据';
-    let h='<div class="section-label">请选择战区</div><div class="card-grid-4">';
+    let h='<div class="section-label">请选择战区 / SELECT WARZONE</div><div class="card-grid-4">';
     data.zones.forEach(z=>{
       h+=`<div class="card-item card-center" onclick="openDetail('${bid}','${z.id}')">
-        <div class="card-name" style="color:${z.color}">${esc(z.name)}</div>
+        <div class="card-name" style="color:${mapBattleColor(z.color)}">${esc(z.name)}</div>
         <div class="card-count">${z.count}条数据</div></div>`;
     });
     h+='</div>';
@@ -429,10 +664,10 @@ async function openZoneBattles(zid){
     const data=await res.json();
     document.getElementById('zbTitle').textContent=data.zone.name;
     document.getElementById('zbInfo').textContent='共'+data.total+'条数据';
-    let h='<div class="section-label">请选择战役</div><div class="card-grid-3">';
+    let h='<div class="section-label">请选择战役 / SELECT BATTLE</div><div class="card-grid-3">';
     data.battles.forEach(b=>{
       h+=`<div class="card-item" onclick="openDetail('${b.id}','${zid}')">
-        <div class="card-name" style="color:${b.color}">${esc(b.name)}</div>
+        <div class="card-name" style="color:${mapBattleColor(b.color)}">${esc(b.name)}</div>
         <div class="card-count">${b.count}条数据</div>
         <div class="card-arrow">&#10095;</div></div>`;
     });
@@ -452,7 +687,6 @@ async function openDetail(bid,zid){
     const res=await fetch('/api/detail/'+bid+'/'+zid+'?token='+TOKEN);
     if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
     const data=await res.json();
-    // 面包屑
     const bc=document.getElementById('detailBreadcrumb');
     bc.innerHTML=`
       <span class="crumb" onclick="openBattleZones('${bid}')">${esc(data.battle.name)}</span>
@@ -468,9 +702,8 @@ async function openDetail(bid,zid){
 function renderDetailPage(data){
   const el=document.getElementById('detailBody');let h='';
 
-  // 基本信息
   if(data.basic){
-    h+=`<div class="module-section"><div class="module-title">基本信息</div><div class="info-card"><div class="card-fields">`;
+    h+=`<div class="module-section"><div class="module-title">基本信息 / OVERVIEW</div><div class="info-card"><div class="card-fields">`;
     const fields={"战役编号":"战役编号","战役":"战役","战区":"战区","指导角色":"指导角色（营销统筹/专员）","作战角色":"作战角色"};
     for(const[label,key] of Object.entries(fields)){
       const v=(data.basic[key]||'').trim();
@@ -479,11 +712,10 @@ function renderDetailPage(data){
     h+=`</div></div></div>`;
   }
 
-  // 目标
   if(data.targets){
     const t=data.targets;const hasVal=Object.values(t).some(v=>v&&v.trim());
     if(hasVal){
-      h+=`<div class="module-section"><div class="module-title">目标</div><div class="info-card"><div class="card-fields">`;
+      h+=`<div class="module-section"><div class="module-title">目标 / TARGETS</div><div class="info-card"><div class="card-fields">`;
       for(const[label,key] of [['战役总目标','战役总目标'],['战区总目标','战区总目标']]){
         const v=(t[key]||'').trim();
         h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
@@ -492,9 +724,8 @@ function renderDetailPage(data){
     }
   }
 
-  // 路径列表
   if(data.paths&&data.paths.length){
-    h+=`<div class="module-section"><div class="module-title">路径</div><div class="path-grid">`;
+    h+=`<div class="module-section"><div class="module-title">路径 / PATHS</div><div class="path-grid">`;
     data.paths.forEach(p=>{
       h+=`<div class="path-card" onclick="openPath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}')">
         <div class="path-name">${esc(p.path_name)}</div>
@@ -537,7 +768,7 @@ function renderPathPage(data){
   const el=document.getElementById('pathBody');let h='';
 
   if(data.path){
-    h+=`<div class="module-section"><div class="module-title">路径信息</div><div class="info-card"><div class="card-fields">`;
+    h+=`<div class="module-section"><div class="module-title">路径信息 / PATH INFO</div><div class="info-card"><div class="card-fields">`;
     [['路径编号','path_id'],['路径','path_name'],['路径目标','path_target']].forEach(([label,key])=>{
       const v=(data.path[key]||'').trim();
       h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
@@ -546,10 +777,11 @@ function renderPathPage(data){
   }
 
   if(data.scenes&&data.scenes.length){
-    h+=`<div class="module-section"><div class="module-title">场景</div><div class="scene-grid">`;
+    h+=`<div class="module-section"><div class="module-title">场景 / SCENES</div><div class="scene-grid">`;
     data.scenes.forEach(s=>{
-      h+=`<div class="scene-card"><div class="scene-header"><span class="scene-id">${esc(s['场景编号'])}</span><span class="scene-name">${esc(s['场景']||'未命名场景')}</span></div><div class="scene-fields">`;
-      [['政策','政策'],['激励','激励'],['标准话术','标准话术'],['商机来源','商机来源'],['最短管控周期','最短管控周期'],['最短管控动作（量）','最短管控动作（量）'],['最短管控目标（积分/金额）','最短管控目标（积分/金额）'],['闭环管控','闭环管控']].forEach(([label,key])=>{
+      const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名场景';
+      h+=`<div class="scene-card"><div class="scene-header"><span class="scene-id">${esc(s['场景编号'])}</span><span class="scene-name">${esc(sceneTitle)}</span></div><div class="scene-fields">`;
+      [['场景名称','场景名称'],['场景（对到话术、作战角色）','场景（对到话术、作战角色）'],['政策','政策'],['激励','激励'],['标准话术','标准话术'],['商机来源','商机来源'],['最短管控周期','最短管控周期'],['最短管控动作（量）','最短管控动作（量）'],['最短管控目标（积分/金额）','最短管控目标（积分/金额）'],['闭环管控','闭环管控']].forEach(([label,key])=>{
         const v=(s[key]||'').trim();
         h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
       });
@@ -581,7 +813,7 @@ function openModal(title, bodyHTML, small){
 }
 function closeModal(){const m=document.getElementById('modalMask');if(m)m.classList.remove('show');}
 
-/* ====== 兵种标签点击查看战役信息（需求1+2） ====== */
+/* ====== 兵种标签点击查看战役信息 ====== */
 async function showRoleBattles(roleName){
   openModal(roleName+' · 战役信息','<div class="empty-state" style="padding:30px">加载中...</div>');
   try{
@@ -596,12 +828,12 @@ async function showRoleBattles(roleName){
       document.getElementById('modalBody').innerHTML='<div class="empty-state">「'+esc(roleName)+'」暂无战役数据</div>';
       return;
     }
-    let h='<div style="font-size:12px;color:var(--ink-gray);margin-bottom:14px;letter-spacing:1px">'+esc(roleName)+' 共参与 '+data.battles.length+' 个战役，'+data.total+' 条数据</div>';
+    let h='<div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;letter-spacing:1px">'+esc(roleName)+' 共参与 '+data.battles.length+' 个战役，'+data.total+' 条数据</div>';
     h+='<div class="card-grid-3" style="gap:12px">';
     data.battles.forEach(b=>{
       const zoneStr=(b.zones||[]).map(z=>z.name).join('、');
       h+=`<div class="card-item" onclick="closeModal();openDetail('${b.id}','${(b.zones[0]||{}).id||''}')">
-        <div class="card-name" style="color:${b.color}">${esc(b.name)}</div>
+        <div class="card-name" style="color:${mapBattleColor(b.color)}">${esc(b.name)}</div>
         <div class="card-count">${b.count}条数据 · ${esc(zoneStr)}</div>
         <div class="card-arrow">&#10095;</div></div>`;
     });
@@ -610,7 +842,7 @@ async function showRoleBattles(roleName){
   }catch(e){document.getElementById('modalBody').innerHTML='<div class="empty-state">加载失败</div>';}
 }
 
-/* ====== 检索侧边抽屉（需求3） ====== */
+/* ====== 检索侧边抽屉 ====== */
 function ensureDrawer(){
   let d=document.getElementById('searchDrawer');
   if(!d){
@@ -623,7 +855,6 @@ function ensureDrawer(){
 }
 function closeDrawer(){const d=document.getElementById('searchDrawer');if(d)d.classList.remove('show');}
 function selectResult(el,bid,zid){
-  // 高亮当前选中项
   document.querySelectorAll('#drawerBody .result-item').forEach(r=>r.classList.remove('active'));
   if(el)el.classList.add('active');
   openDetail(bid,zid);
