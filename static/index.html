@@ -188,10 +188,12 @@ body>*{position:relative;z-index:1}
 .sub-header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
   background:linear-gradient(90deg,transparent 5%,var(--cyan) 25%,var(--blue-bright) 50%,var(--cyan) 75%,transparent 95%)}
 
-.back-btn{padding:7px 18px;border:1px solid rgba(0,212,255,.2);border-radius:3px;
+.back-btn,.home-btn{padding:7px 18px;border:1px solid rgba(0,212,255,.2);border-radius:3px;
   background:transparent;color:var(--text-secondary);cursor:pointer;font-family:inherit;
   font-size:13px;transition:all .25s;white-space:nowrap;letter-spacing:1px}
-.back-btn:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-sm)}
+.back-btn:hover,.home-btn:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-sm)}
+.home-btn{border-color:rgba(255,217,128,.25);color:var(--text-accent)}
+.home-btn:hover{border-color:var(--text-accent);color:var(--text-accent);box-shadow:0 0 10px rgba(255,217,128,.12)}
 .sub-title{font-family:var(--font-display);font-size:18px;color:var(--cyan);letter-spacing:4px;
   text-shadow:0 0 12px var(--cyan-glow)}
 .sub-title-sep{color:var(--text-dim);font-size:16px}
@@ -543,7 +545,7 @@ body>*{position:relative;z-index:1}
 <!-- 战役→战区选择页 -->
 <div class="page page-battle-zones" id="pageBattleZones">
   <div class="sub-header">
-    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button><button class="home-btn" onclick="goMain()">&#8962; 主页</button>
     <div class="sub-title" id="bzTitle"></div>
     <div class="sub-info" id="bzInfo"></div>
   </div>
@@ -553,7 +555,7 @@ body>*{position:relative;z-index:1}
 <!-- 战区→战役选择页 -->
 <div class="page page-zone-battles" id="pageZoneBattles">
   <div class="sub-header">
-    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button><button class="home-btn" onclick="goMain()">&#8962; 主页</button>
     <div class="sub-title" id="zbTitle"></div>
     <div class="sub-info" id="zbInfo"></div>
   </div>
@@ -563,7 +565,7 @@ body>*{position:relative;z-index:1}
 <!-- 数据详情页（战役+战区交叉） -->
 <div class="page page-detail" id="pageDetail">
   <div class="sub-header">
-    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button><button class="home-btn" onclick="goMain()">&#8962; 主页</button>
     <div class="breadcrumb" id="detailBreadcrumb"></div>
     <div class="sub-info" id="detailInfo"></div>
   </div>
@@ -573,7 +575,7 @@ body>*{position:relative;z-index:1}
 <!-- 路径→场景列表页 -->
 <div class="page page-path" id="pagePath">
   <div class="sub-header">
-    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button><button class="home-btn" onclick="goMain()">&#8962; 主页</button>
     <div class="breadcrumb" id="pathBreadcrumb"></div>
     <div class="sub-info" id="pathInfo"></div>
   </div>
@@ -583,7 +585,7 @@ body>*{position:relative;z-index:1}
 <!-- 场景详情页（10个单元模块） -->
 <div class="page page-scene" id="pageScene">
   <div class="sub-header">
-    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button><button class="home-btn" onclick="goMain()">&#8962; 主页</button>
     <div class="breadcrumb" id="sceneBreadcrumb"></div>
     <div class="sub-info" id="sceneInfo"></div>
   </div>
@@ -593,7 +595,7 @@ body>*{position:relative;z-index:1}
 <!-- 单元信息展示页 -->
 <div class="page page-unit" id="pageUnit">
   <div class="sub-header">
-    <button class="back-btn" onclick="goBack()">&#8592; 返回</button>
+    <button class="back-btn" onclick="goBack()">&#8592; 返回</button><button class="home-btn" onclick="goMain()">&#8962; 主页</button>
     <div class="breadcrumb" id="unitBreadcrumb"></div>
     <div class="sub-info" id="unitInfo"></div>
   </div>

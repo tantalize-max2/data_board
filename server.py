@@ -159,26 +159,49 @@ def group_paths(rows: List[dict]) -> List[dict]:
 
 
 def get_battle_basic(rows: List[dict]) -> Optional[dict]:
+    first = None
+    guide_roles = set()
+    combat_roles = set()
     for r in rows:
-        if r.get("battle_name"):
-            return {
-                "战役编号": r.get("battle_no", ""),
-                "战役": r["battle_name"],
-                "战区": r.get("warzone_name", ""),
-                "指导角色（营销统筹/专员）": r.get("guide_role", ""),
-                "作战角色": r.get("combat_role", ""),
-            }
-    return None
+        if not r.get("battle_name"):
+            continue
+        if first is None:
+            first = r
+        g = str(r.get("guide_role", "") or "").strip()
+        c = str(r.get("combat_role", "") or "").strip()
+        if g:
+            guide_roles.add(g)
+        if c:
+            combat_roles.add(c)
+    if first is None:
+        return None
+    return {
+        "战役编号": first.get("battle_no", ""),
+        "战役": first["battle_name"],
+        "战区": first.get("warzone_name", ""),
+        "指导角色（营销统筹/专员）": "、".join(sorted(guide_roles)),
+        "作战角色": "、".join(sorted(combat_roles)),
+    }
 
 
 def get_battle_targets(rows: List[dict]) -> Optional[dict]:
+    bt = set()
+    zt = set()
     for r in rows:
-        if r.get("battle_name"):
-            return {
-                "战役总目标": r.get("battle_target", ""),
-                "战区总目标": r.get("warzone_target", ""),
-            }
-    return None
+        if not r.get("battle_name"):
+            continue
+        b = str(r.get("battle_target", "") or "").strip()
+        w = str(r.get("warzone_target", "") or "").strip()
+        if b:
+            bt.add(b)
+        if w:
+            zt.add(w)
+    if not bt and not zt:
+        return None
+    return {
+        "战役总目标": "、".join(sorted(bt)),
+        "战区总目标": "、".join(sorted(zt)),
+    }
 
 
 def get_scenes(rows: List[dict], path_no: str) -> List[dict]:
