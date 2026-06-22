@@ -323,7 +323,7 @@ function showPage(name){
   window.scrollTo(0,0);
 }
 function goMain(){showPage('main');}
-function openAdmin(){window.open('/admin?token='+encodeURIComponent(TOKEN),'_blank');}
+function openAdmin(){location.href='/admin?token='+encodeURIComponent(TOKEN);}
 
 async function doLogin(){
   const rid=document.getElementById('selRole').value,pwd=document.getElementById('txtPwd').value;
