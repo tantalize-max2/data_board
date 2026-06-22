@@ -354,45 +354,69 @@ async def search(request: Request, keyword: str = ""):
 
 @app.get("/api/role-battles/{role_name}")
 async def role_battles(role_name: str, request: Request):
-    """查看某角色（作战角色/指导角色）的战役信息（兵种标签点击）
-    权限：基于当前用户可见数据范围（get_role_rows），指导角色和作战角色权限逻辑一致。
+    """查看某角色的战役信息（兵种标签点击）
+    兵种标签显示 users.role_name：
+    - 分局长/客户经理：通过战区自动权限查本战区全部数据
+    - 其他角色：通过 role_access 表查授权的战役/战区
     """
     s = require_session(request)
     role_name = (role_name or "").strip()
     if not role_name:
         raise HTTPException(400, "角色名不能为空")
-    rows = get_role_rows(s)
+    u = db.query_one("SELECT role_id,zone,role_name FROM users WHERE role_name=%s AND is_active=1 LIMIT 1", (role_name,))
     bl, wl = battle_lookup(), warzone_lookup()
-    # 在可见数据中匹配 combat_role 或 guide_role（指导/作战角色统一逻辑）
-    matched = [r for r in rows
-               if str(r.get("combat_role", "") or "").strip() == role_name
-               or str(r.get("guide_role", "") or "").strip() == role_name]
-    if not matched:
-        return {"role_name": role_name, "battles": [], "total": 0}
-
-    # 按战役+战区聚合
-    battle_map: Dict[str, Dict[str, int]] = {}
-    for r in matched:
-        bid, zid = r.get("battle_id"), r.get("warzone_id")
-        if bid and zid:
-            battle_map.setdefault(bid, {})
-            battle_map[bid][zid] = battle_map[bid].get(zid, 0) + 1
-
     battles = []
-    for bid in sorted(battle_map.keys()):
-        b = bl.get(bid)
-        if not b:
-            continue
-        zones = []
-        total = 0
-        for zid, zcnt in battle_map[bid].items():
-            w = wl.get(zid)
-            if w:
-                zones.append({"id": w["id"], "name": w["name"], "color": w["color"], "count": zcnt})
-                total += zcnt
-        battles.append({"id": b["id"], "name": b["name"], "color": b["color"],
-                        "count": total, "zones": zones})
-    return {"role_name": role_name, "battles": battles, "total": len(matched)}
+
+    if u:
+        urn = u["role_name"] or ""
+        is_zone_mgr = "分局长" in urn or "客户经理" in urn
+
+        if is_zone_mgr and u.get("zone"):
+            # 分局长/客户经理：本战区全部数据
+            rows = db.query_all(
+                "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order,id",
+                (u["zone"],))
+            rows = [r for r in rows if has_substantive(r)]
+            battle_map: Dict[str, Dict[str, int]] = {}
+            for r in rows:
+                bid, zid = r.get("battle_id"), r.get("warzone_id")
+                if bid and zid:
+                    battle_map.setdefault(bid, {})[zid] = battle_map.get(bid, {}).get(zid, 0) + 1
+            for bid in sorted(battle_map.keys()):
+                b = bl.get(bid)
+                if not b:
+                    continue
+                zones = []
+                total = 0
+                for zid, zcnt in battle_map[bid].items():
+                    w = wl.get(zid)
+                    if w:
+                        zones.append({"id": w["id"], "name": w["name"], "color": w["color"], "count": zcnt})
+                        total += zcnt
+                battles.append({"id": b["id"], "name": b["name"], "color": b["color"],
+                                "count": total, "zones": zones})
+        else:
+            # 普通角色：查 role_access 表
+            pairs = db.query_all("SELECT DISTINCT battle_id,warzone_id FROM role_access WHERE role_id=%s", (u["role_id"],))
+            for p in pairs:
+                bid, zid = p["battle_id"], p["warzone_id"]
+                cnt_r = db.query_one(
+                    "SELECT COUNT(*) c FROM deployment_records WHERE battle_id=%s AND warzone_id=%s",
+                    (bid, zid))
+                cnt = cnt_r["c"] if cnt_r else 0
+                if cnt > 0:
+                    b = bl.get(bid)
+                    w = wl.get(zid)
+                    if b and w:
+                        existing = next((x for x in battles if x["id"] == bid), None)
+                        if existing:
+                            existing["zones"].append({"id": w["id"], "name": w["name"], "color": w["color"], "count": cnt})
+                            existing["count"] += cnt
+                        else:
+                            battles.append({"id": b["id"], "name": b["name"], "color": b["color"],
+                                            "count": cnt, "zones": [{"id": w["id"], "name": w["name"], "color": w["color"], "count": cnt}]})
+
+    return {"role_name": role_name, "battles": battles, "total": sum(b["count"] for b in battles)}
 
 
 @app.get("/api/battle-zones/{battle_id}")

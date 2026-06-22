@@ -5,50 +5,52 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>百日攻坚"夏收"行动标准化穿透部署</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=ZCOOL+XiaoWei&display=swap');
 
 *{margin:0;padding:0;box-sizing:border-box}
 
 :root{
-  /* ---- 驾驶舱色板（明亮蓝版 v7  — 更强层次感）---- */
-  --bg-deep:#1c3f7a;
-  --bg-dark:#2860a8;
-  --bg-panel:#3888d0;
-  --bg-card:rgba(60,140,220,.85);
-  --bg-card-hover:rgba(80,160,240,.9);
-  --bg-input:rgba(40,100,180,.9);
+  /* ---- 深邃海洋色板（柔和自然版）---- */
+  --bg-deep:#102a4a;
+  --bg-dark:#1a3a6b;
+  --bg-panel:#2256a0;
+  --bg-card:rgba(45,90,150,.75);
+  --bg-card-hover:rgba(60,115,190,.85);
+  --bg-input:rgba(25,60,110,.9);
 
-  --cyan:#38d0ff;
-  --cyan-dim:#28baee;
-  --cyan-glow:rgba(56,208,255,.24);
-  --cyan-bg:rgba(56,208,255,.12);
-  --blue:#5a9eff;
-  --blue-bright:#82c2ff;
-  --blue-glow:rgba(90,158,255,.24);
-  --blue-bg:rgba(90,158,255,.12);
-  --teal:#50ffe0;
-  --teal-dim:#28e0ba;
-  --teal-glow:rgba(80,255,224,.2);
-  --aurora:#9e8cfc;
-  --aurora-glow:rgba(158,140,252,.2);
+  /* 强调色：冰蓝白而非刺眼青色 */
+  --cyan:#a8d5ff;
+  --cyan-dim:#7fb8e8;
+  --cyan-glow:rgba(168,213,255,.18);
+  --cyan-bg:rgba(168,213,255,.08);
+  --blue:#6ba3d8;
+  --blue-bright:#9cc8f0;
+  --blue-glow:rgba(107,163,216,.18);
+  --blue-bg:rgba(107,163,216,.08);
+  --teal:#8eecd0;
+  --teal-dim:#6cd4b0;
+  --teal-glow:rgba(142,236,208,.15);
+  --aurora:#c4b5e8;
+  --aurora-glow:rgba(196,181,232,.15);
 
+  /* 文字色：纯白为主，避免青色文字 */
   --text-primary:#ffffff;
-  --text-secondary:#ffffff;
-  --text-dim:#e8f4ff;
-  --text-accent:#ffffff;
+  --text-secondary:#e8eef5;
+  --text-dim:#b8c8d8;
+  --text-accent:#ffd980;
 
-  --border:rgba(120,200,255,.38);
-  --border-hover:rgba(140,220,255,.6);
-  --border-active:rgba(160,230,255,.8);
-  --divider:rgba(140,200,255,.18);
+  --border:rgba(150,200,250,.25);
+  --border-hover:rgba(180,220,255,.4);
+  --border-active:rgba(200,235,255,.6);
+  --divider:rgba(150,200,250,.12);
 
-  --glow-sm:0 0 10px rgba(80,180,255,.25);
-  --glow-md:0 0 24px rgba(80,180,255,.18);
-  --glow-lg:0 0 48px rgba(80,180,255,.1);
-  --shadow-panel:0 4px 24px rgba(0,10,40,.22);
+  --glow-sm:0 0 12px rgba(120,180,240,.12);
+  --glow-md:0 0 24px rgba(120,180,240,.08);
+  --glow-lg:0 0 48px rgba(120,180,240,.05);
+  --shadow-panel:0 8px 32px rgba(0,8,30,.3);
 
-  --radius:4px;
-  --font-display:'Orbitron','Noto Sans SC',monospace;
+  --radius:6px;
+  --font-display:'ZCOOL XiaoWei','Noto Sans SC',serif;
   --font-body:'Noto Sans SC','Microsoft YaHei',sans-serif;
 }
 
@@ -112,9 +114,9 @@ body>*{position:relative;z-index:1}
 .login-corner-bl{bottom:-1px;left:-1px;border-bottom:2px solid var(--cyan);border-left:2px solid var(--cyan)}
 .login-corner-br{bottom:-1px;right:-1px;border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan)}
 
-.login-box h1{text-align:center;font-size:24px;color:var(--cyan);margin-bottom:4px;
-  font-family:var(--font-display);letter-spacing:4px;
-  text-shadow:0 0 20px var(--cyan-glow)}
+.login-box h1{text-align:center;font-size:22px;color:var(--text-primary);margin-bottom:4px;
+  font-family:var(--font-display);letter-spacing:3px;
+  text-shadow:0 2px 8px rgba(0,0,0,.3)}
 .login-box .sub{text-align:center;color:var(--text-secondary);font-size:12px;margin-bottom:32px;letter-spacing:4px}
 .login-box .field{margin-bottom:20px}
 .login-box label{display:block;font-size:12px;color:#e0f0ff;margin-bottom:6px;letter-spacing:2px;font-weight:500}
@@ -146,17 +148,17 @@ body>*{position:relative;z-index:1}
   border-bottom:1px solid var(--border-hover);
   box-shadow:0 2px 20px rgba(0,0,0,.3);
 }
-.header-bar::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent 5%,var(--cyan) 25%,var(--blue-bright) 50%,var(--cyan) 75%,transparent 95%)}
+.header-bar::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent 5%,var(--text-accent) 25%,var(--blue-bright) 50%,var(--text-accent) 75%,transparent 95%);opacity:.5}
 .header-bar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--cyan-dim),transparent);opacity:.3}
+  background:linear-gradient(90deg,transparent,var(--blue-bright),transparent);opacity:.2}
 
 .header-inner{max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1}
 
-.header-title{font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;font-size:30px;font-weight:900;color:var(--cyan);letter-spacing:4px;
-  text-shadow:0 0 16px var(--cyan-glow);position:relative}
+.header-title{font-family:var(--font-display);font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:3px;
+  text-shadow:0 2px 8px rgba(0,0,0,.3);position:relative}
 .header-title::after{content:'';position:absolute;bottom:-6px;left:0;width:60px;height:2px;
-  background:linear-gradient(90deg,var(--cyan),transparent);opacity:.6}
+  background:linear-gradient(90deg,var(--text-accent),transparent);opacity:.7}
 
 .header-user{display:flex;align-items:center;gap:10px}
 .zone-badge{padding:3px 14px;border-radius:3px;font-size:11px;color:var(--text-accent);letter-spacing:1px;
@@ -198,8 +200,8 @@ body>*{position:relative;z-index:1}
 /* 面包屑 */
 .breadcrumb{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .breadcrumb .crumb{font-size:13px;color:var(--text-dim);cursor:pointer;transition:color .2s;letter-spacing:1px}
-.breadcrumb .crumb:hover{color:var(--cyan)}
-.breadcrumb .crumb.active{color:var(--cyan);font-weight:700;cursor:default;text-shadow:0 0 8px var(--cyan-glow)}
+.breadcrumb .crumb:hover{color:var(--text-accent)}
+.breadcrumb .crumb.active{color:var(--text-accent);font-weight:700;cursor:default}
 .breadcrumb .sep{color:var(--text-dim);font-size:10px;opacity:.4}
 
 /* ============================================================
@@ -207,12 +209,10 @@ body>*{position:relative;z-index:1}
    ============================================================ */
 .main-body{max-width:1400px;margin:0 auto;padding:28px}
 
-.section-label{font-size:14px;font-weight:700;color:var(--cyan);margin-bottom:14px;
-  padding-left:14px;border-left:3px solid var(--cyan);letter-spacing:4px;position:relative;
-  text-shadow:0 0 8px var(--cyan-glow)}
+.section-label{font-size:14px;font-weight:700;color:var(--text-accent);margin-bottom:14px;
+  padding-left:14px;border-left:3px solid var(--text-accent);letter-spacing:4px;position:relative}
 .section-label::before{content:'';position:absolute;left:-8px;top:50%;width:8px;height:8px;
-  transform:translateY(-50%) rotate(45deg);background:var(--cyan);opacity:.3;
-  box-shadow:0 0 6px var(--cyan-glow)}
+  transform:translateY(-50%) rotate(45deg);background:var(--text-accent);opacity:.4}
 
 /* ---- 战役/战区 通用卡片网格 ---- */
 .card-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
@@ -220,48 +220,46 @@ body>*{position:relative;z-index:1}
 
 .card-item{
   background:var(--bg-card);
-  border:1px solid var(--border-hover);border-radius:var(--radius);padding:24px 20px;
-  cursor:pointer;transition:all .35s;position:relative;overflow:hidden}
-.card-item::before{content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;
-  border-radius:5px;
-  background:linear-gradient(135deg,transparent 30%,var(--cyan) 50%,transparent 70%);
-  opacity:0;transition:opacity .35s;z-index:-1}
-.card-item:hover{transform:translateY(-4px);border-color:var(--border-hover);
-  box-shadow:0 0 24px var(--cyan-glow),0 8px 32px rgba(0,0,0,.3)}
-.card-item:hover::before{opacity:.12}
+  border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;
+  cursor:pointer;transition:all .35s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden;
+  backdrop-filter:blur(8px)}
+.card-item::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--text-accent),var(--blue-bright),transparent);
+  opacity:.4;transition:opacity .35s}
+.card-item:hover{transform:translateY(-3px);border-color:var(--border-hover);
+  box-shadow:0 12px 36px rgba(0,5,25,.4),0 0 0 1px var(--border-hover);background:var(--bg-card-hover)}
+.card-item:hover::before{opacity:.8}
 .card-item::after{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
   background:linear-gradient(180deg,transparent,var(--cyan),transparent);opacity:.4;transition:opacity .3s}
 .card-item:hover::after{opacity:1}
 
 .card-item .card-name{font-size:18px;font-weight:700;letter-spacing:3px;margin-bottom:6px;padding-left:8px;
   text-shadow:0 0 12px currentColor,0 1px 3px rgba(0,0,0,.5)}
-.card-item .card-count{font-size:12px;color:var(--cyan);padding-left:8px;letter-spacing:1px;
-  text-shadow:0 0 8px var(--cyan-glow),0 1px 2px rgba(0,0,0,.4)}
+.card-item .card-count{font-size:12px;color:var(--text-dim);padding-left:8px;letter-spacing:1px}
 .card-item .card-arrow{position:absolute;right:18px;top:50%;transform:translateY(-50%);
-  font-size:18px;opacity:.2;transition:all .3s;color:var(--cyan)}
-.card-item:hover .card-arrow{opacity:.7;right:14px;text-shadow:0 0 8px var(--cyan-glow)}
+  font-size:18px;opacity:.2;transition:all .3s;color:var(--text-secondary)}
+.card-item:hover .card-arrow{opacity:.6;right:14px}
 
 /* 战区型卡片（居中无箭头） */
 .card-center{text-align:center;padding:28px 20px}
 .card-center .card-name{font-size:18px;font-weight:700;letter-spacing:4px;margin-bottom:6px;padding-left:0;
-  text-shadow:0 0 12px currentColor,0 1px 3px rgba(0,0,0,.5)}
-.card-center .card-count{padding-left:0;color:var(--cyan);
-  text-shadow:0 0 8px var(--cyan-glow),0 1px 2px rgba(0,0,0,.4)}
+  text-shadow:0 1px 4px rgba(0,0,0,.4)}
+.card-center .card-count{padding-left:0;color:var(--text-dim)}
 .card-center::after{display:none}
 
 /* ---- 兵种区 ---- */
 .troop-overview{
-  background:linear-gradient(170deg,rgba(0,212,255,.04),rgba(46,125,255,.02));
+  background:rgba(255,255,255,.03);
   border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;
   margin-bottom:28px;position:relative;overflow:hidden;
-  box-shadow:var(--glow-sm)}
-.troop-overview::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;
-  border-radius:50%;background:radial-gradient(circle,var(--cyan-glow),transparent 70%);pointer-events:none;opacity:.3}
-.troop-overview .label{font-weight:700;font-size:13px;color:var(--cyan);margin-bottom:12px;
-  letter-spacing:3px;padding-left:10px;border-left:3px solid var(--cyan)}
+  backdrop-filter:blur(8px)}
+.troop-overview::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;
+  background:linear-gradient(180deg,var(--text-accent),transparent);opacity:.5}
+.troop-overview .label{font-weight:700;font-size:13px;color:var(--text-accent);margin-bottom:12px;
+  letter-spacing:3px;padding-left:10px;border-left:3px solid var(--text-accent)}
 .troop-zones-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .troop-zone-group .tz-name{font-size:13px;font-weight:700;margin-bottom:8px;letter-spacing:2px;
-  padding-bottom:4px;border-bottom:1px solid var(--divider)}
+  padding-bottom:4px;border-bottom:1px solid var(--divider);color:var(--text-secondary)}
 .troop-zone-group .tz-roles{display:flex;flex-wrap:wrap;gap:6px}
 
 .tz-tag{padding:4px 14px;border-radius:3px;font-size:11px;
@@ -277,26 +275,26 @@ body>*{position:relative;z-index:1}
 /* ---- 标语 ---- */
 .motto-section{text-align:center;padding:28px 24px;margin:20px 0;position:relative}
 .motto-section::before,.motto-section::after{content:'';position:absolute;left:10%;right:10%;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(0,212,255,.2),transparent)}
+  background:linear-gradient(90deg,transparent,rgba(255,217,128,.2),transparent)}
 .motto-section::before{top:0}.motto-section::after{bottom:0}
-.motto-text{font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;color:var(--cyan);font-size:24px;font-weight:900;letter-spacing:6px;opacity:1;
-  text-shadow:0 0 16px var(--cyan-glow),0 1px 3px rgba(0,0,0,.4)}
-.motto-sub{color:var(--text-primary);font-size:20px;font-weight:700;letter-spacing:6px;opacity:1;margin-top:12px;
-  text-shadow:0 0 8px var(--cyan-glow),0 1px 2px rgba(0,0,0,.4)}
+.motto-text{font-family:var(--font-display);color:var(--text-accent);font-size:22px;font-weight:700;letter-spacing:6px;
+  text-shadow:0 2px 6px rgba(0,0,0,.3)}
+.motto-sub{color:var(--text-primary);font-size:18px;font-weight:500;letter-spacing:6px;margin-top:10px;
+  text-shadow:0 1px 4px rgba(0,0,0,.3)}
 
 /* ---- 检索框 ---- */
 .search-section{display:flex;gap:12px;margin-bottom:28px}
 .search-input{flex:1;height:46px;border:1px solid var(--border);border-radius:var(--radius);
   padding:0 18px;font-size:14px;outline:none;background:var(--bg-input);color:var(--text-primary);
   font-family:inherit;transition:all .25s}
-.search-input::placeholder{color:var(--text-secondary)}
-.search-input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-glow);background:rgba(0,212,255,.04)}
+.search-input::placeholder{color:var(--text-dim)}
+.search-input:focus{border-color:var(--text-accent);box-shadow:0 0 0 2px rgba(255,217,128,.15)}
 .search-btn{height:46px;padding:0 32px;
-  background:linear-gradient(135deg,var(--cyan-dim),var(--blue));color:#fff;
+  background:linear-gradient(135deg,var(--blue),var(--blue-bright));color:#fff;
   border:none;border-radius:var(--radius);font-size:15px;font-weight:700;
   cursor:pointer;font-family:inherit;letter-spacing:6px;transition:all .25s;
   text-shadow:0 1px 2px rgba(0,0,0,.3)}
-.search-btn:hover{box-shadow:0 0 20px var(--cyan-glow);filter:brightness(1.1);transform:translateY(-1px)}
+.search-btn:hover{filter:brightness(1.15);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
 
 /* ---- 通用弹窗 ---- */
 .modal-mask{position:fixed;inset:0;background:rgba(10,20,50,.6);backdrop-filter:blur(4px);
@@ -305,7 +303,7 @@ body>*{position:relative;z-index:1}
 .modal-box{background:linear-gradient(170deg,var(--bg-panel),var(--bg-dark));
   border:1px solid var(--border-hover);border-radius:6px;width:100%;max-width:760px;
   max-height:84vh;display:flex;flex-direction:column;
-  box-shadow:0 0 60px rgba(0,212,255,.06),0 24px 80px rgba(0,0,0,.4);overflow:hidden;
+  box-shadow:0 24px 80px rgba(0,0,0,.5);overflow:hidden;
   position:relative}
 .modal-box.small{max-width:520px}
 .modal-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
@@ -684,10 +682,10 @@ function renderBattleGrid(battles){
   document.getElementById('mainBattleGrid').innerHTML=h;
 }
 
-/* 将原始暖色系颜色映射为亮色系（确保在蓝卡片上可读） */
+/* 颜色映射：原始暖色 → 自然柔和色（白/金/浅蓝/浅绿） */
 function mapBattleColor(c){
-  const m={'#8B1A1A':'#00e8ff','#C0392B':'#90d4ff','#A63A3A':'#c8b8ff','#2E7D32':'#40ffd8'};
-  return m[c]||'#00e8ff';
+  const m={'#8B1A1A':'#ffd980','#C0392B':'#ffb060','#A63A3A':'#c4b5e8','#2E7D32':'#8eecd0'};
+  return m[c]||'#ffffff';
 }
 
 function renderZoneGrid(zones){

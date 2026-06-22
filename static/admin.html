@@ -5,48 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>管理后台 · 夏收行动标准化穿透部署</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=ZCOOL+XiaoWei&display=swap');
 
 *{margin:0;padding:0;box-sizing:border-box}
 
 :root{
-  --bg-deep:#1c3f7a;
-  --bg-dark:#2860a8;
-  --bg-panel:#3888d0;
-  --bg-card:rgba(60,140,220,.85);
-  --bg-card-hover:rgba(80,160,240,.9);
-  --bg-input:rgba(40,100,180,.9);
+  --bg-deep:#102a4a;
+  --bg-dark:#1a3a6b;
+  --bg-panel:#2256a0;
+  --bg-card:rgba(45,90,150,.75);
+  --bg-card-hover:rgba(60,115,190,.85);
+  --bg-input:rgba(25,60,110,.9);
 
-  --cyan:#38d0ff;
-  --cyan-dim:#28baee;
-  --cyan-glow:rgba(56,208,255,.24);
-  --cyan-bg:rgba(56,208,255,.12);
-  --blue:#5a9eff;
-  --blue-bright:#82c2ff;
-  --blue-glow:rgba(90,158,255,.24);
-  --blue-bg:rgba(90,158,255,.12);
-  --teal:#50ffe0;
-  --teal-dim:#28e0ba;
-  --teal-glow:rgba(80,255,224,.2);
-  --aurora:#9e8cfc;
-  --aurora-glow:rgba(158,140,252,.2);
+  --cyan:#a8d5ff;
+  --cyan-dim:#7fb8e8;
+  --cyan-glow:rgba(168,213,255,.18);
+  --cyan-bg:rgba(168,213,255,.08);
+  --blue:#6ba3d8;
+  --blue-bright:#9cc8f0;
+  --blue-glow:rgba(107,163,216,.18);
+  --blue-bg:rgba(107,163,216,.08);
+  --teal:#8eecd0;
+  --teal-dim:#6cd4b0;
+  --teal-glow:rgba(142,236,208,.15);
+  --aurora:#c4b5e8;
+  --aurora-glow:rgba(196,181,232,.15);
 
   --text-primary:#ffffff;
-  --text-secondary:#ffffff;
-  --text-dim:#e8f4ff;
-  --text-accent:#ffffff;
+  --text-secondary:#e8eef5;
+  --text-dim:#b8c8d8;
+  --text-accent:#ffd980;
 
-  --border:rgba(120,200,255,.38);
-  --border-hover:rgba(140,220,255,.6);
-  --border-active:rgba(160,230,255,.8);
-  --divider:rgba(140,200,255,.18);
+  --border:rgba(150,200,250,.25);
+  --border-hover:rgba(180,220,255,.4);
+  --border-active:rgba(200,235,255,.6);
+  --divider:rgba(150,200,250,.12);
 
-  --glow-sm:0 0 10px rgba(80,180,255,.2);
-  --glow-md:0 0 24px rgba(80,180,255,.14);
-  --shadow-panel:0 4px 24px rgba(0,10,40,.22);
+  --glow-sm:0 0 12px rgba(120,180,240,.12);
+  --glow-md:0 0 24px rgba(120,180,240,.08);
+  --shadow-panel:0 8px 32px rgba(0,8,30,.3);
 
-  --radius:4px;
-  --font-display:'Orbitron','Noto Sans SC',monospace;
+  --radius:6px;
+  --font-display:'ZCOOL XiaoWei','Noto Sans SC',serif;
   --font-body:'Noto Sans SC','Microsoft YaHei',sans-serif;
 }
 
@@ -304,11 +304,11 @@ function backToBoard(){
   location.href='/?token='+encodeURIComponent(TOKEN);
 }
 
-/* 颜色映射：原始暖色 → 亮色系（确保在蓝卡片上可读） */
+/* 颜色映射：原始暖色 → 自然柔和色 */
 function mapColor(c){
-  const m={'#8B1A1A':'#00e8ff','#C0392B':'#90d4ff','#A63A3A':'#c8b8ff','#2E7D32':'#40ffd8',
-           '#1565c0':'#00e8ff','#2e7d32':'#40ffd8','#7b1fa2':'#c8b8ff','#e65100':'#ffaa00'};
-  return m[c]||'#00e8ff';
+  const m={'#8B1A1A':'#ffd980','#C0392B':'#ffb060','#A63A3A':'#c4b5e8','#2E7D32':'#8eecd0',
+           '#1565c0':'#ffd980','#2e7d32':'#8eecd0','#7b1fa2':'#c4b5e8','#e65100':'#ffb060'};
+  return m[c]||'#ffffff';
 }
 
 const ZONE_LABEL = {public:'公众战区',business:'商业战区',education:'教科战区',industry:'行业战区',all:'全部战区'};
