@@ -306,6 +306,41 @@ async def overview(request: Request):
             "zones": zone_stats, "total": len(rows)}
 
 
+@app.get("/api/search")
+async def search(request: Request, keyword: str = ""):
+    """按指导角色/作战角色检索部署记录（结果按当前用户权限过滤）"""
+    s = require_session(request)
+    kw = (keyword or "").strip()
+    if not kw:
+        return {"keyword": "", "results": [], "total": 0}
+    rows = get_role_rows(s)
+    bl, wl = battle_lookup(), warzone_lookup()
+    matched = []
+    for r in rows:
+        guide = str(r.get("guide_role", "") or "")
+        combat = str(r.get("combat_role", "") or "")
+        scene = str(r.get("scene_name", "") or "")
+        if kw in guide or kw in combat or kw in scene:
+            b = bl.get(r.get("battle_id"), {})
+            w = wl.get(r.get("warzone_id"), {})
+            matched.append({
+                "battle_id": r.get("battle_id", ""),
+                "battle_name": r.get("battle_name", ""),
+                "warzone_id": r.get("warzone_id", ""),
+                "warzone_name": r.get("warzone_name", ""),
+                "path_no": r.get("path_no", ""),
+                "path_name": r.get("path_name", ""),
+                "scene_no": r.get("scene_no", ""),
+                "scene_name": r.get("scene_name", ""),
+                "guide_role": guide,
+                "combat_role": combat,
+                "policy": r.get("policy", ""),
+                "battle_color": b.get("color", ""),
+                "warzone_color": w.get("color", ""),
+            })
+    return {"keyword": kw, "results": matched, "total": len(matched)}
+
+
 @app.get("/api/battle-zones/{battle_id}")
 async def battle_zones(battle_id: str, request: Request):
     """战役子页面：该战役下有哪些战区有数据"""
