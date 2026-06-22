@@ -103,7 +103,7 @@ body>*{position:relative;z-index:1}
   border-top:1px solid var(--divider);margin-top:8px;text-transform:uppercase}
 .nav-section-title:first-child{border-top:none;margin-top:0}
 
-.admin-main{padding:24px 28px;max-width:1400px}
+.admin-main{padding:24px 28px;overflow-y:auto}
 .tab-panel{display:none}
 .tab-panel.active{display:block;animation:fadeIn .3s}
 
@@ -198,25 +198,29 @@ body>*{position:relative;z-index:1}
 .record-card .rec-meta span{white-space:nowrap}
 .record-card .rec-actions{display:flex;gap:8px;flex-shrink:0}
 
-/* 弹窗 */
-.modal-mask{position:fixed;inset:0;background:rgba(10,20,50,.6);backdrop-filter:blur(4px);
-  display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
-.modal-mask.show{display:flex;animation:fadeIn .2s}
-.modal{background:linear-gradient(170deg,var(--bg-panel),var(--bg-dark));
-  border:1px solid var(--border-hover);border-radius:6px;width:100%;max-width:640px;
-  max-height:88vh;overflow:hidden;display:flex;flex-direction:column;
-  box-shadow:0 0 40px rgba(0,212,255,.06),0 24px 80px rgba(0,0,0,.35);position:relative}
-.modal.large{max-width:880px}
-.modal::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,var(--cyan),var(--blue),var(--cyan),transparent)}
-.modal-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;
-  align-items:center;justify-content:space-between}
-.modal-header h3{font-family:var(--font-display);font-size:15px;color:var(--cyan);letter-spacing:3px}
-.modal-close{width:28px;height:28px;border:1px solid var(--border);background:transparent;
+/* 弹窗 - 改为右侧抽屉，不遮挡左侧内容 */
+.admin-drawer{position:fixed;top:0;right:-560px;width:540px;height:100vh;
+  background:linear-gradient(180deg,var(--bg-panel),var(--bg-dark));
+  box-shadow:-8px 0 40px rgba(0,0,0,.3),0 0 20px var(--cyan-glow);z-index:1000;
+  transition:right .3s ease;display:flex;flex-direction:column;
+  border-left:2px solid var(--cyan-dim)}
+.admin-drawer.show{right:0}
+.admin-drawer.large{width:700px;right:-720px}
+.admin-drawer.large.show{right:0}
+.admin-drawer .drawer-header{padding:18px 24px;
+  background:linear-gradient(180deg,rgba(28,68,130,.98),rgba(22,56,110,.95));
+  border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.admin-drawer .drawer-header h3{font-family:var(--font-display);font-size:15px;color:var(--cyan);letter-spacing:3px}
+.admin-drawer .drawer-close{width:28px;height:28px;border:1px solid var(--border);background:transparent;
   font-size:18px;color:var(--text-dim);cursor:pointer;line-height:1;border-radius:3px;transition:all .2s}
-.modal-close:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-sm)}
-.modal-body{padding:22px 24px;overflow-y:auto;flex:1}
-.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.admin-drawer .drawer-close:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow-sm)}
+.admin-drawer .drawer-body{padding:22px 24px;overflow-y:auto;flex:1}
+.admin-drawer .drawer-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0}
+
+/* 抽屉背后遮罩（半透明，点击关闭） */
+.admin-drawer-mask{position:fixed;inset:0;background:rgba(10,20,50,.3);
+  z-index:999;display:none;transition:opacity .3s}
+.admin-drawer-mask.show{display:block}
 
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .form-grid .full{grid-column:1/-1}
@@ -284,12 +288,11 @@ body>*{position:relative;z-index:1}
   </main>
 </div>
 
-<div class="modal-mask" id="modalMask">
-  <div class="modal" id="modalBox">
-    <div class="modal-header"><h3 id="modalTitle"></h3><button class="modal-close" onclick="closeModal()">&times;</button></div>
-    <div class="modal-body" id="modalBody"></div>
-    <div class="modal-footer" id="modalFooter"></div>
-  </div>
+<div class="admin-drawer-mask" id="drawerMask"></div>
+<div class="admin-drawer" id="adminDrawer">
+  <div class="drawer-header"><h3 id="drawerTitle"></h3><button class="drawer-close" onclick="closeDrawer()">&times;</button></div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-footer" id="drawerFooter"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -311,7 +314,7 @@ function mapColor(c){
   return m[c]||'#ffffff';
 }
 
-const ZONE_LABEL = {public:'公众战区',business:'商业战区',education:'教科战区',industry:'行业战区',all:'全部战区'};
+const ZONE_LABEL = {public:'公众战区',business:'商业战区',education:'校园战区',industry:'行业战区',all:'全部战区'};
 const ZONE_CLASS = {public:'tag-public',business:'tag-business',education:'tag-education',industry:'tag-industry',all:'tag-admin'};
 let DASHBOARD=null, RECORD_SCHEMA=null;
 
@@ -334,14 +337,20 @@ function toast(msg, type=''){
   clearTimeout(t._t); t._t=setTimeout(()=>t.className='toast '+type, 2400);
 }
 function openModal(title, bodyHTML, footerHTML, large){
-  document.getElementById('modalTitle').textContent=title;
-  document.getElementById('modalBody').innerHTML=bodyHTML;
-  document.getElementById('modalFooter').innerHTML=footerHTML||'';
-  document.getElementById('modalBox').className='modal'+(large?' large':'');
-  document.getElementById('modalMask').classList.add('show');
+  document.getElementById('drawerTitle').textContent=title;
+  document.getElementById('drawerBody').innerHTML=bodyHTML;
+  document.getElementById('drawerFooter').innerHTML=footerHTML||'';
+  const drawer=document.getElementById('adminDrawer');
+  drawer.className='admin-drawer'+(large?' large':'');
+  document.getElementById('drawerMask').classList.add('show');
+  drawer.classList.add('show');
 }
-function closeModal(){document.getElementById('modalMask').classList.remove('show');}
-document.getElementById('modalMask').addEventListener('click',e=>{if(e.target.id==='modalMask')closeModal();});
+function closeModal(){
+  document.getElementById('adminDrawer').classList.remove('show');
+  document.getElementById('drawerMask').classList.remove('show');
+}
+function closeDrawer(){closeModal();}
+document.getElementById('drawerMask').addEventListener('click',closeModal);
 
 /* Tab 切换 */
 const TAB_LOADERS = {overview:loadOverview, users:loadUsers, access:loadAccess, content:loadContent};
@@ -397,7 +406,7 @@ async function loadUsers(){
         <option value="">全部战区</option>
         <option value="public"${USERS_STATE.zone==='public'?' selected':''}>公众战区</option>
         <option value="business"${USERS_STATE.zone==='business'?' selected':''}>商业战区</option>
-        <option value="education"${USERS_STATE.zone==='education'?' selected':''}>教科战区</option>
+        <option value="education"${USERS_STATE.zone==='education'?' selected':''}>校园战区</option>
         <option value="industry"${USERS_STATE.zone==='industry'?' selected':''}>行业战区</option>
       </select>
       <button class="btn btn-primary" onclick="fetchUsers()">搜索</button>
@@ -613,24 +622,27 @@ async function fetchRecords(){
     document.getElementById('recCount').textContent='共 '+d.total+' 条';
     const el=document.getElementById('recordList');
     if(!d.records.length){ el.innerHTML='<div class="empty">无记录，点击"新增记录"添加</div>'; return; }
-    el.innerHTML='<div class="record-list">'+d.records.map(r=>`
-      <div class="record-card">
-        <div class="rec-no">${esc(r.id)}</div>
-        <div class="rec-info">
-          <div class="rec-title">${esc(r.battle_name||'未命名战役')} · ${esc(r.path_name||'—')} · ${esc(r.scene_name?(r.scene_name.slice(0,20)+'...'):'（路径级）')}</div>
-          <div class="rec-meta">
-            <span>战区：${esc(r.warzone_name||'—')}</span>
-            <span>路径：${esc(r.path_no||'—')}</span>
-            <span>场景：${esc(r.scene_no||'—')}</span>
-            <span>作战角色：${esc(r.combat_role||'—')}</span>
-            ${r.updated_by?`<span>最后修改：${esc(r.updated_by)}</span>`:''}
-          </div>
-        </div>
-        <div class="rec-actions">
-          <button class="btn btn-ghost btn-sm" onclick="openRecordEdit(${r.id})">编辑</button>
-          <button class="btn btn-danger btn-sm" onclick="delRecord(${r.id})">删除</button>
-        </div>
-      </div>`).join('')+'</div>';
+    const showFields=['battle_name','warzone_name','path_no','path_name','scene_no','scene_title','guide_role','combat_role'];
+    el.innerHTML=`
+      <table class="data-table">
+        <thead><tr>
+          <th>ID</th>${showFields.map(k=>{const f=RECORD_SCHEMA.fields.find(x=>x.key===k);return '<th>'+(f?f.label:k)+'</th>';}).join('')}<th>操作</th>
+        </tr></thead>
+        <tbody>${d.records.map(r=>`
+          <tr>
+            <td style="color:var(--text-dim);font-size:11px">${r.id}</td>
+            ${showFields.map(k=>{
+              const v=String(r[k]||'').trim();
+              const short=v.length>28?v.slice(0,28)+'...':v;
+              return '<td title="'+esc(v)+'" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(short?esc(short):'<span style="color:var(--text-dim)">—</span>')+'</td>';
+            }).join('')}
+            <td style="white-space:nowrap">
+              <button class="btn btn-ghost btn-sm" onclick="openRecordEdit(${r.id})">编辑</button>
+              <button class="btn btn-danger btn-sm" onclick="delRecord(${r.id})">删除</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
   }catch(e){ document.getElementById('recordList').innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
 }
 
