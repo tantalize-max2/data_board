@@ -1,71 +1,42 @@
 # -*- coding: utf-8 -*-
-"""夏收行动部署看板 - FastAPI后端 (并列维度版)
-战役和战区为并列耦合筛选条件：
-  点击战役 → 按战区分组 → 点击战区 → 数据详情
-  点击战区 → 按战役分组 → 点击战役 → 数据详情
-权限：按数据行中作战角色/指导角色列匹配过滤
+"""夏收行动部署看板 - FastAPI后端 (MySQL版)
+
+重构要点：
+  1. 数据源从 JSON 文件改为 MySQL（库 xiashou2）
+  2. 用户表 users 含 phone 字段（暂不用于登录）
+  3. 权限模型：role_access 表（角色 × 战役 × 战区），弃用中文子串匹配
+  4. 总经理(is_admin=1) 可见全部，并能检索人员、分配权限、编辑板块
+  5. 普通角色只能看到 role_access 中授权的 (战役,战区) 板块
+
+API 兼容：原有 6 个业务接口签名不变，前端无需改动调用方式。
+新增：/api/roles, /api/admin/* 一组管理接口。
 """
-import json, hashlib, time, os, secrets
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
+import os, hashlib, time, secrets
+from typing import Optional, List, Dict, Any
+from fastapi import FastAPI, Request, HTTPException, Query
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+
+import db
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 app = FastAPI(title="夏收行动部署看板")
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
-with open(os.path.join(DATA_DIR, "roles.json"), encoding="utf-8") as f:
-    ROLES = json.load(f)
-with open(os.path.join(DATA_DIR, "warzones.json"), encoding="utf-8") as f:
-    WARZONES = json.load(f)
-with open(os.path.join(DATA_DIR, "battles.json"), encoding="utf-8") as f:
-    BATTLES = json.load(f)
-with open(os.path.join(DATA_DIR, "all_records.json"), encoding="utf-8") as f:
-    ALL_RECORDS = json.load(f)
-with open(os.path.join(DATA_DIR, "columns.json"), encoding="utf-8") as f:
-    COLUMNS = json.load(f)
-
-SESSIONS = {}
+# ====== 会话（内存，TTL 8 小时）======
+SESSIONS: Dict[str, dict] = {}
 SESSION_TTL = 3600 * 8
 
-ROLE_KEYWORDS = {
-    "分局长（公）": ["分局", "公"],
-    "直销": ["直销"],
-    "工程师（公）": ["工程师", "公"],
-    "营业员": ["营业"],
-    "存量专员": ["存量"],
-    "渠道经理": ["渠道"],
-    "分局长（商）": ["分局", "商"],
-    "客户经理（商）": ["客户经理", "商"],
-    "特战队": ["特战"],
-    "工程师（商）": ["工程师", "商"],
-    "分局长（校）": ["分局", "校"],
-    "客户经理（校）": ["客户经理", "校"],
-    "分局长（行）": ["分局", "行"],
-    "客户经理（行）": ["客户经理", "行"],
-}
-ROLE_EXCLUSIONS = {
-    "分局长（公）": ["商", "校", "行", "教科", "行业"],
-    "工程师（公）": ["商", "校", "行", "教科", "行业"],
-    "分局长（商）": ["公", "校", "行", "公众", "教科", "行业"],
-    "工程师（商）": ["公", "校", "行", "公众", "教科", "行业"],
-    "分局长（校）": ["公", "商", "行", "公众", "商业", "行业"],
-    "客户经理（校）": ["公", "商", "行", "公众", "商业", "行业"],
-    "分局长（行）": ["公", "商", "校", "公众", "商业", "教科"],
-    "客户经理（行）": ["公", "商", "校", "公众", "商业", "教科"],
-}
+
+# ====== 认证辅助 ======
+def verify_password(stored_hash: str, salt: str, pwd: str) -> bool:
+    h = hashlib.sha256((pwd + salt).encode()).hexdigest()
+    return h == stored_hash
 
 
-def verify_password(role_id, pwd):
-    for r in ROLES:
-        if r["id"] == role_id:
-            salt = r["password_salt"]
-            h = hashlib.sha256((pwd + salt).encode()).hexdigest()
-            return h == r["password_hash"]
-    return False
-
-
-def get_session(token):
+def get_session(token: str) -> Optional[dict]:
     s = SESSIONS.get(token)
     if not s:
         return None
@@ -75,154 +46,211 @@ def get_session(token):
     return s
 
 
-def get_role_info(rid):
-    for r in ROLES:
-        if r["id"] == rid:
-            return {"id": r["id"], "name": r["name"], "zone": r["zone"], "zone_name": r["zone_name"], "color": r["color"]}
-    return None
+def require_session(request: Request) -> dict:
+    """从 query 或 header 取 token，未登录抛 401"""
+    token = request.query_params.get("token") or request.headers.get("X-Token", "")
+    s = get_session(token)
+    if not s:
+        raise HTTPException(401, "未登录或会话已过期")
+    return s
 
 
-def row_matches_role(row, role_id):
-    if role_id == "总经理":
-        return True
-    keywords = ROLE_KEYWORDS.get(role_id, [role_id])
-    exclusions = ROLE_EXCLUSIONS.get(role_id, [])
-    check_values = []
-    for col in ["作战角色", "指导角色（营销统筹/专员）", "场景（对到话术、作战角色）"]:
-        v = str(row.get(col, "")).strip()
-        if v:
-            check_values.append(v)
-    all_text = " ".join(str(v) for v in row.values())
-    for cv in check_values:
-        if all(kw in cv for kw in keywords):
-            if not any(ex in cv for ex in exclusions):
-                return True
-    if role_id in all_text:
-        return True
-    return False
+def require_admin(request: Request) -> dict:
+    """仅总经理放行"""
+    s = require_session(request)
+    if not s.get("is_admin"):
+        raise HTTPException(403, "需要总经理权限")
+    return s
 
 
-def has_substantive_content(row):
-    """Check if a row has content beyond the battle-level fields (编号/战役/战役总目标).
-    Rows with only battle name but no zone/path/scene content are placeholders."""
-    substantive_cols = ["战区", "战区总目标", "路径编号", "路径", "路径目标",
-                        "场景编号", "场景（对到话术、作战角色）", "作战角色",
-                        "指导角色（营销统筹/专员）", "政策", "激励", "标准话术",
-                        "商机来源", "最短管控周期", "最短管控动作（量）",
-                        "最短管控目标（积分/金额）", "闭环管控（注：要写清楚融入到531、642、321中去）"]
-    return any(str(row.get(col, "")).strip() for col in substantive_cols)
+def get_user_info(username: str) -> Optional[dict]:
+    row = db.query_one(
+        "SELECT username,name,role_id,role_name,phone,zone,zone_name,color,is_admin "
+        "FROM users WHERE username=%s AND is_active=1", (username,))
+    if not row:
+        return None
+    return {
+        "id": row["role_id"],          # 兼容前端 role.id
+        "username": row["username"],
+        "name": row["name"],
+        "role_id": row["role_id"],
+        "role_name": row["role_name"],
+        "phone": row["phone"] or "",
+        "zone": row["zone"],
+        "zone_name": row["zone_name"],
+        "color": row["color"],
+        "is_admin": bool(row["is_admin"]),
+    }
 
 
-def get_role_rows(rid):
-    if rid == "总经理":
-        return [r for r in ALL_RECORDS if has_substantive_content(r)]
-    return [r for r in ALL_RECORDS if row_matches_role(r, rid) and has_substantive_content(r)]
+# ====== 业务辅助 ======
+SUBSTANTIVE_COLS = ["warzone_name", "warzone_target", "path_no", "path_name", "path_target",
+                    "scene_no", "scene_name", "guide_role", "combat_role",
+                    "opportunity_source", "control_cycle", "control_action",
+                    "control_target", "policy", "incentive", "standard_talk",
+                    "closed_loop_control"]
 
 
-def fill_hierarchy(rows):
-    result = []
-    last = {}
-    fill_cols = ["战役编号", "战役", "战役总目标", "战区", "战区总目标", "路径编号", "路径", "路径目标"]
-    for r in rows:
-        new_row = dict(r)
-        for col in fill_cols:
-            val = str(new_row.get(col, "")).strip()
-            if val:
-                last[col] = val
-                new_row[col] = val
-            elif col in last:
-                new_row[col] = last[col]
-        result.append(new_row)
-    return result
+def has_substantive(r: dict) -> bool:
+    """排除只有战役名称、无实质内容的占位行"""
+    return any(str(r.get(c, "") or "").strip() for c in SUBSTANTIVE_COLS)
 
 
-def group_paths_from_rows(rows):
+def get_accessible_pairs(s: dict) -> List[tuple]:
+    """返回该会话用户能看到的 (battle_id, warzone_id) 列表；总经理返回 None 表示全部"""
+    if s.get("is_admin"):
+        return None
+    rows = db.query_all(
+        "SELECT DISTINCT battle_id, warzone_id FROM role_access WHERE role_id=%s",
+        (s["role_id"],))
+    return [(r["battle_id"], r["warzone_id"]) for r in rows]
+
+
+def get_role_rows(s: dict) -> List[dict]:
+    """返回该用户可见的所有实质性记录"""
+    pairs = get_accessible_pairs(s)
+    if pairs is None:
+        sql = "SELECT * FROM deployment_records ORDER BY sort_order, id"
+        rows = db.query_all(sql)
+    else:
+        if not pairs:
+            return []
+        # 用 OR 拼接 (battle_id, warzone_id) 组合
+        where = " OR ".join(["(battle_id=%s AND warzone_id=%s)"] * len(pairs))
+        args = []
+        for b, w in pairs:
+            args.extend([b, w])
+        sql = f"SELECT * FROM deployment_records WHERE {where} ORDER BY sort_order, id"
+        rows = db.query_all(sql, args)
+    return [r for r in rows if has_substantive(r)]
+
+
+def battle_lookup() -> Dict[str, dict]:
+    return {b["id"]: b for b in db.query_all("SELECT * FROM battles ORDER BY sort_order")}
+
+
+def warzone_lookup() -> Dict[str, dict]:
+    return {w["id"]: w for w in db.query_all("SELECT * FROM warzones ORDER BY sort_order")}
+
+
+def group_paths(rows: List[dict]) -> List[dict]:
+    """从记录行聚合出路径列表（保持原 API 结构）"""
     paths = {}
     for r in rows:
-        pid = str(r.get("路径编号", "")).strip()
-        pname = str(r.get("路径", "")).strip()
-        ptarget = str(r.get("路径目标", "")).strip()
-        if not pid or not pname:
-            continue
-        # Skip placeholder paths like "..."
-        if pid == "..." or pname == "...":
+        pid = str(r.get("path_no", "") or "").strip()
+        pname = str(r.get("path_name", "") or "").strip()
+        ptarget = str(r.get("path_target", "") or "").strip()
+        if not pid or not pname or pid == "..." or pname == "...":
             continue
         if pid not in paths:
             paths[pid] = {"path_id": pid, "path_name": pname, "path_target": ptarget, "scene_count": 0}
-        sid = str(r.get("场景编号", "")).strip()
-        if sid:
+        if str(r.get("scene_no", "") or "").strip():
             paths[pid]["scene_count"] += 1
     return list(paths.values())
 
 
-def get_battle_basic_info(rows):
+def get_battle_basic(rows: List[dict]) -> Optional[dict]:
     for r in rows:
-        if str(r.get("战役", "")).strip():
+        if r.get("battle_name"):
             return {
-                "战役编号": str(r.get("战役编号", "")).strip(),
-                "战役": str(r.get("战役", "")).strip(),
-                "战区": str(r.get("战区", "")).strip(),
-                "指导角色（营销统筹/专员）": str(r.get("指导角色（营销统筹/专员）", "")).strip(),
-                "作战角色": str(r.get("作战角色", "")).strip(),
+                "战役编号": r.get("battle_no", ""),
+                "战役": r["battle_name"],
+                "战区": r.get("warzone_name", ""),
+                "指导角色（营销统筹/专员）": r.get("guide_role", ""),
+                "作战角色": r.get("combat_role", ""),
             }
     return None
 
 
-def get_battle_targets(rows):
+def get_battle_targets(rows: List[dict]) -> Optional[dict]:
     for r in rows:
-        if str(r.get("战役", "")).strip():
+        if r.get("battle_name"):
             return {
-                "战役总目标": str(r.get("战役总目标", "")).strip(),
-                "战区总目标": str(r.get("战区总目标", "")).strip(),
+                "战役总目标": r.get("battle_target", ""),
+                "战区总目标": r.get("warzone_target", ""),
             }
     return None
 
 
-def get_scenes_for_path(rows, path_id):
+def get_scenes(rows: List[dict], path_no: str) -> List[dict]:
+    """路径下的场景列表（保持原字段名供前端直接渲染）"""
     scenes = []
     for r in rows:
-        pid = str(r.get("路径编号", "")).strip()
-        if pid != path_id:
+        if str(r.get("path_no", "") or "").strip() != path_no:
             continue
-        sid = str(r.get("场景编号", "")).strip()
+        sid = str(r.get("scene_no", "") or "").strip()
         if not sid:
             continue
         scenes.append({
             "场景编号": sid,
-            "场景": str(r.get("场景（对到话术、作战角色）", "")).strip(),
-            "政策": str(r.get("政策", "")).strip(),
-            "激励": str(r.get("激励", "")).strip(),
-            "标准话术": str(r.get("标准话术", "")).strip(),
-            "商机来源": str(r.get("商机来源", "")).strip(),
-            "最短管控周期": str(r.get("最短管控周期", "")).strip(),
-            "最短管控动作（量）": str(r.get("最短管控动作（量）", "")).strip(),
-            "最短管控目标（积分/金额）": str(r.get("最短管控目标（积分/金额）", "")).strip(),
-            "闭环管控": str(r.get("闭环管控（注：要写清楚融入到531、642、321中去）", "")).strip(),
+            "场景（对到话术、作战角色）": r.get("scene_name", ""),
+            "指导角色（营销统筹/专员）": r.get("guide_role", ""),
+            "作战角色": r.get("combat_role", ""),
+            "商机来源": r.get("opportunity_source", ""),
+            "最短管控周期": r.get("control_cycle", ""),
+            "最短管控动作（量）": r.get("control_action", ""),
+            "最短管控目标（积分/金额）": r.get("control_target", ""),
+            "政策": r.get("policy", ""),
+            "激励": r.get("incentive", ""),
+            "标准话术": r.get("standard_talk", ""),
+            "闭环管控": r.get("closed_loop_control", ""),
         })
     return scenes
 
 
 # ====== 页面 ======
-
 @app.get("/")
 async def index():
     with open(os.path.join(BASE_DIR, "static", "index.html"), encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 
-# ====== API ======
+@app.get("/admin")
+async def admin_page():
+    p = os.path.join(BASE_DIR, "static", "admin.html")
+    if os.path.exists(p):
+        with open(p, encoding="utf-8") as f:
+            return HTMLResponse(f.read())
+    raise HTTPException(404, "管理页面未生成")
+
+
+# ====== 公开 API ======
+@app.get("/api/roles")
+async def roles():
+    """登录页角色下拉数据源（含电话字段，暂不展示）"""
+    rows = db.query_all(
+        "SELECT username,role_id,role_name,zone,zone_name,color,is_admin "
+        "FROM users WHERE is_active=1 ORDER BY is_admin DESC, zone, role_name")
+    groups = {}
+    for r in rows:
+        g = "管理层" if r["is_admin"] else r["zone_name"]
+        groups.setdefault(g, []).append({
+            "id": r["role_id"], "name": r["role_name"],
+            "zone": r["zone"], "zone_name": r["zone_name"], "color": r["color"],
+        })
+    return groups
+
 
 @app.post("/api/login")
 async def login(request: Request):
+    """兼容前端：role_id 或 username 字段任一即可"""
     body = await request.json()
-    rid, pwd = body.get("role_id", ""), body.get("password", "")
+    rid = body.get("role_id") or body.get("username") or ""
+    pwd = body.get("password") or ""
     if not rid or not pwd:
         raise HTTPException(400, "参数不完整")
-    if not verify_password(rid, pwd):
+    user = db.query_one("SELECT * FROM users WHERE username=%s AND is_active=1", (rid,))
+    if not user or not verify_password(user["password_hash"], user["password_salt"], pwd):
         raise HTTPException(401, "岗位或密码错误")
+    info = get_user_info(rid)
     token = secrets.token_hex(32)
-    SESSIONS[token] = {"role_id": rid, "expire": time.time() + SESSION_TTL}
-    return {"token": token, "role": get_role_info(rid)}
+    SESSIONS[token] = {
+        "username": user["username"],
+        "role_id": user["role_id"],
+        "is_admin": bool(user["is_admin"]),
+        "expire": time.time() + SESSION_TTL,
+    }
+    return {"token": token, "role": info}
 
 
 @app.post("/api/logout")
@@ -232,187 +260,407 @@ async def logout(request: Request):
     return {"ok": True}
 
 
+@app.get("/api/me")
+async def me(request: Request):
+    """当前登录人信息（前端可据此判断是否显示管理入口）"""
+    s = require_session(request)
+    return get_user_info(s["username"])
+
+
+# ====== 业务 API（保持原前端契约）======
+
 @app.get("/api/overview")
 async def overview(request: Request):
-    """主页概览：只返回该角色有数据的战役和战区"""
-    token = request.query_params.get("token", "")
-    s = get_session(token)
-    if not s:
-        raise HTTPException(401, "未登录")
-    rid = s["role_id"]
-    rows = get_role_rows(rid)
-    filled = fill_hierarchy(rows)
+    """主页概览：该角色有数据的战役和战区"""
+    s = require_session(request)
+    rows = get_role_rows(s)
+    bl = battle_lookup()
+    wl = warzone_lookup()
 
     battle_stats = []
-    for b in BATTLES:
-        b_rows = [r for r in filled if b["name"] in str(r.get("战役", ""))]
-        if b_rows:
-            battle_stats.append({"id": b["id"], "name": b["name"], "color": b["color"], "count": len(b_rows)})
+    bcount: Dict[str, int] = {}
+    for r in rows:
+        bid = r.get("battle_id")
+        if bid:
+            bcount[bid] = bcount.get(bid, 0) + 1
+    for bid, cnt in bcount.items():
+        b = bl.get(bid)
+        if b:
+            battle_stats.append({"id": b["id"], "name": b["name"], "color": b["color"], "count": cnt})
 
     zone_stats = []
-    for wz in WARZONES:
-        z_rows = [r for r in filled if wz["name"] in str(r.get("战区", ""))]
-        if z_rows:
-            zone_stats.append({"id": wz["id"], "name": wz["name"], "color": wz["color"], "count": len(z_rows), "roles": wz.get("roles", [])})
+    zcount: Dict[str, int] = {}
+    for r in rows:
+        zid = r.get("warzone_id")
+        if zid:
+            zcount[zid] = zcount.get(zid, 0) + 1
+    for zid, cnt in zcount.items():
+        w = wl.get(zid)
+        if w:
+            roles = [u["role_name"] for u in db.query_all(
+                "SELECT DISTINCT role_name FROM users WHERE zone=%s AND is_active=1 AND is_admin=0", (zid,))]
+            zone_stats.append({"id": w["id"], "name": w["name"], "color": w["color"],
+                               "count": cnt, "roles": roles})
 
-    return {"role": get_role_info(rid), "battles": battle_stats, "zones": zone_stats, "total": len(filled)}
+    return {"role": get_user_info(s["username"]), "battles": battle_stats,
+            "zones": zone_stats, "total": len(rows)}
 
 
 @app.get("/api/battle-zones/{battle_id}")
 async def battle_zones(battle_id: str, request: Request):
-    """战役子页面：展示该战役下有哪些战区有数据"""
-    token = request.query_params.get("token", "")
-    s = get_session(token)
-    if not s:
-        raise HTTPException(401, "未登录")
-    rid = s["role_id"]
-    rows = get_role_rows(rid)
-    filled = fill_hierarchy(rows)
-
-    battle_info = None
-    for b in BATTLES:
-        if b["id"] == battle_id:
-            battle_info = {"id": b["id"], "name": b["name"], "color": b["color"]}
-            break
-    if not battle_info:
+    """战役子页面：该战役下有哪些战区有数据"""
+    s = require_session(request)
+    rows = get_role_rows(s)
+    bl = battle_lookup()
+    wl = warzone_lookup()
+    b = bl.get(battle_id)
+    if not b:
         raise HTTPException(404, "战役不存在")
+    b_rows = [r for r in rows if r.get("battle_id") == battle_id]
 
-    b_rows = [r for r in filled if battle_info["name"] in str(r.get("战役", ""))]
-
-    # 按战区分组
     zone_list = []
-    for wz in WARZONES:
-        z_rows = [r for r in b_rows if wz["name"] in str(r.get("战区", ""))]
-        if z_rows:
-            zone_list.append({
-                "id": wz["id"], "name": wz["name"], "color": wz["color"],
-                "count": len(z_rows), "roles": wz.get("roles", [])
-            })
-
-    return {"role": get_role_info(rid), "battle": battle_info, "zones": zone_list, "total": len(b_rows)}
+    zcount: Dict[str, int] = {}
+    for r in b_rows:
+        zid = r.get("warzone_id")
+        if zid:
+            zcount[zid] = zcount.get(zid, 0) + 1
+    for zid, cnt in zcount.items():
+        w = wl.get(zid)
+        if w:
+            zone_list.append({"id": w["id"], "name": w["name"], "color": w["color"], "count": cnt})
+    return {"role": get_user_info(s["username"]), "battle": {"id": b["id"], "name": b["name"], "color": b["color"]},
+            "zones": zone_list, "total": len(b_rows)}
 
 
 @app.get("/api/zone-battles/{zone_id}")
 async def zone_battles(zone_id: str, request: Request):
-    """战区子页面：展示该战区下有哪些战役有数据"""
-    token = request.query_params.get("token", "")
-    s = get_session(token)
-    if not s:
-        raise HTTPException(401, "未登录")
-    rid = s["role_id"]
-    rows = get_role_rows(rid)
-    filled = fill_hierarchy(rows)
-
-    zone_info = None
-    for wz in WARZONES:
-        if wz["id"] == zone_id:
-            zone_info = {"id": wz["id"], "name": wz["name"], "color": wz["color"], "roles": wz.get("roles", [])}
-            break
-    if not zone_info:
+    """战区子页面：该战区下有哪些战役有数据"""
+    s = require_session(request)
+    rows = get_role_rows(s)
+    bl = battle_lookup()
+    wl = warzone_lookup()
+    w = wl.get(zone_id)
+    if not w:
         raise HTTPException(404, "战区不存在")
+    z_rows = [r for r in rows if r.get("warzone_id") == zone_id]
 
-    z_rows = [r for r in filled if zone_info["name"] in str(r.get("战区", ""))]
-
-    # 按战役分组
     battle_list = []
-    for b in BATTLES:
-        b_rows = [r for r in z_rows if b["name"] in str(r.get("战役", ""))]
-        if b_rows:
-            battle_list.append({"id": b["id"], "name": b["name"], "color": b["color"], "count": len(b_rows)})
-
-    return {"role": get_role_info(rid), "zone": zone_info, "battles": battle_list, "total": len(z_rows)}
+    bcount: Dict[str, int] = {}
+    for r in z_rows:
+        bid = r.get("battle_id")
+        if bid:
+            bcount[bid] = bcount.get(bid, 0) + 1
+    for bid, cnt in bcount.items():
+        b = bl.get(bid)
+        if b:
+            battle_list.append({"id": b["id"], "name": b["name"], "color": b["color"], "count": cnt})
+    roles = [u["role_name"] for u in db.query_all(
+        "SELECT DISTINCT role_name FROM users WHERE zone=%s AND is_active=1 AND is_admin=0", (zone_id,))]
+    return {"role": get_user_info(s["username"]),
+            "zone": {"id": w["id"], "name": w["name"], "color": w["color"], "roles": roles},
+            "battles": battle_list, "total": len(z_rows)}
 
 
 @app.get("/api/detail/{battle_id}/{zone_id}")
 async def cross_detail(battle_id: str, zone_id: str, request: Request):
-    """数据详情：战役+战区交叉过滤，展示基本信息+目标+路径列表"""
-    token = request.query_params.get("token", "")
-    s = get_session(token)
-    if not s:
-        raise HTTPException(401, "未登录")
-    rid = s["role_id"]
-    rows = get_role_rows(rid)
-    filled = fill_hierarchy(rows)
-
-    battle_info = None
-    for b in BATTLES:
-        if b["id"] == battle_id:
-            battle_info = {"id": b["id"], "name": b["name"], "color": b["color"]}
-            break
-
-    zone_info = None
-    for wz in WARZONES:
-        if wz["id"] == zone_id:
-            zone_info = {"id": wz["id"], "name": wz["name"], "color": wz["color"], "roles": wz.get("roles", [])}
-            break
-
-    # 交叉过滤
-    cross_rows = [r for r in filled
-                  if battle_info and battle_info["name"] in str(r.get("战役", ""))
-                  and zone_info and zone_info["name"] in str(r.get("战区", ""))]
-
-    basic = get_battle_basic_info(cross_rows)
-    targets = get_battle_targets(cross_rows)
-    paths = group_paths_from_rows(cross_rows)
-
+    """数据详情：战役+战区交叉过滤"""
+    s = require_session(request)
+    rows = get_role_rows(s)
+    bl, wl = battle_lookup(), warzone_lookup()
+    b, w = bl.get(battle_id), wl.get(zone_id)
+    if not b or not w:
+        raise HTTPException(404, "战役或战区不存在")
+    cross = [r for r in rows if r.get("battle_id") == battle_id and r.get("warzone_id") == zone_id]
     return {
-        "role": get_role_info(rid),
-        "battle": battle_info,
-        "zone": zone_info,
-        "basic": basic,
-        "targets": targets,
-        "paths": paths,
-        "total": len(cross_rows)
+        "role": get_user_info(s["username"]),
+        "battle": {"id": b["id"], "name": b["name"], "color": b["color"]},
+        "zone": {"id": w["id"], "name": w["name"], "color": w["color"]},
+        "basic": get_battle_basic(cross),
+        "targets": get_battle_targets(cross),
+        "paths": group_paths(cross),
+        "total": len(cross),
     }
 
 
 @app.get("/api/path-detail/{battle_id}/{zone_id}/{path_id}")
 async def path_detail(battle_id: str, zone_id: str, path_id: str, request: Request):
-    """路径详情：战役+战区+路径 过滤，展示场景列表"""
-    token = request.query_params.get("token", "")
-    s = get_session(token)
-    if not s:
-        raise HTTPException(401, "未登录")
-    rid = s["role_id"]
-    rows = get_role_rows(rid)
-    filled = fill_hierarchy(rows)
-
-    battle_info = None
-    for b in BATTLES:
-        if b["id"] == battle_id:
-            battle_info = {"id": b["id"], "name": b["name"], "color": b["color"]}
-            break
-
-    zone_info = None
-    for wz in WARZONES:
-        if wz["id"] == zone_id:
-            zone_info = {"id": wz["id"], "name": wz["name"], "color": wz["color"]}
-            break
-
-    cross_rows = [r for r in filled
-                  if battle_info and battle_info["name"] in str(r.get("战役", ""))
-                  and zone_info and zone_info["name"] in str(r.get("战区", ""))]
-
+    """路径详情：场景列表"""
+    s = require_session(request)
+    rows = get_role_rows(s)
+    bl, wl = battle_lookup(), warzone_lookup()
+    b, w = bl.get(battle_id), wl.get(zone_id)
+    cross = [r for r in rows if r.get("battle_id") == battle_id and r.get("warzone_id") == zone_id]
     path_info = None
-    for r in cross_rows:
-        if str(r.get("路径编号", "")).strip() == path_id:
-            path_info = {
-                "path_id": path_id,
-                "path_name": str(r.get("路径", "")).strip(),
-                "path_target": str(r.get("路径目标", "")).strip(),
-            }
+    for r in cross:
+        if str(r.get("path_no", "") or "").strip() == path_id:
+            path_info = {"path_id": path_id, "path_name": r.get("path_name", ""),
+                         "path_target": r.get("path_target", "")}
             break
-
-    scenes = get_scenes_for_path(cross_rows, path_id)
-
+    scenes = get_scenes(cross, path_id)
     return {
-        "role": get_role_info(rid),
-        "battle": battle_info,
-        "zone": zone_info,
-        "path": path_info,
-        "scenes": scenes,
-        "total": len(scenes)
+        "role": get_user_info(s["username"]),
+        "battle": {"id": b["id"], "name": b["name"], "color": b["color"]} if b else None,
+        "zone": {"id": w["id"], "name": w["name"], "color": w["color"]} if w else None,
+        "path": path_info, "scenes": scenes, "total": len(scenes),
     }
+
+
+# ====== 管理 API（仅总经理）======
+
+# 记录字段定义（DB列名 → 中文标签 → 控件类型），供前端动态渲染编辑表单
+RECORD_FIELDS = [
+    ("battle_no", "战役编号", "text"),
+    ("battle_name", "战役", "text"),
+    ("battle_target", "战役总目标", "textarea"),
+    ("warzone_name", "战区", "select_warzone"),
+    ("warzone_target", "战区总目标", "textarea"),
+    ("path_no", "路径编号", "text"),
+    ("path_name", "路径", "text"),
+    ("path_target", "路径目标", "textarea"),
+    ("scene_no", "场景编号", "text"),
+    ("scene_name", "场景（对到话术、作战角色）", "textarea"),
+    ("guide_role", "指导角色（营销统筹/专员）", "text"),
+    ("combat_role", "作战角色", "text"),
+    ("opportunity_source", "商机来源", "text"),
+    ("control_cycle", "最短管控周期", "text"),
+    ("control_action", "最短管控动作（量）", "textarea"),
+    ("control_target", "最短管控目标（积分/金额）", "textarea"),
+    ("policy", "政策", "textarea"),
+    ("incentive", "激励", "textarea"),
+    ("standard_talk", "标准话术", "textarea"),
+    ("closed_loop_control", "闭环管控（注：要写清楚融入到531、642、321中去）", "textarea"),
+]
+RECORD_DB_COLS = [f[0] for f in RECORD_FIELDS]
+
+
+@app.get("/api/admin/dashboard")
+async def admin_dashboard(request: Request):
+    """管理首页统计"""
+    require_admin(request)
+    u_total = db.query_one("SELECT COUNT(*) c FROM users WHERE is_active=1")["c"]
+    r_total = db.query_one("SELECT COUNT(*) c FROM deployment_records")["c"]
+    a_total = db.query_one("SELECT COUNT(*) c FROM role_access")["c"]
+    battles = db.query_all("SELECT * FROM battles ORDER BY sort_order")
+    warzones = db.query_all("SELECT * FROM warzones ORDER BY sort_order")
+    # 各战区人员数
+    zone_users = db.query_all(
+        "SELECT zone, COUNT(*) c FROM users WHERE is_active=1 AND is_admin=0 GROUP BY zone")
+    return {
+        "users": u_total, "records": r_total, "access_rules": a_total,
+        "battles": battles, "warzones": warzones,
+        "zone_users": {r["zone"]: r["c"] for r in zone_users},
+    }
+
+
+# ---- 人员管理 ----
+@app.get("/api/admin/users")
+async def admin_users(request: Request, q: str = "", zone: str = ""):
+    """人员列表（支持关键词 q 与战区过滤）"""
+    require_admin(request)
+    sql = ("SELECT id,username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_active,"
+           "created_at FROM users WHERE 1=1")
+    args = []
+    if q:
+        sql += " AND (name LIKE %s OR role_name LIKE %s OR phone LIKE %s OR username LIKE %s)"
+        kw = f"%{q}%"
+        args += [kw, kw, kw, kw]
+    if zone:
+        sql += " AND zone=%s"
+        args.append(zone)
+    sql += " ORDER BY is_admin DESC, zone, role_name"
+    rows = db.query_all(sql, args)
+    return {"total": len(rows), "users": rows, "me": get_user_info(require_admin(request)["username"])}
+
+
+@app.post("/api/admin/users")
+async def admin_create_user(request: Request):
+    """新增人员"""
+    require_admin(request)
+    body = await request.json()
+    username = (body.get("username") or "").strip()
+    role_name = (body.get("role_name") or "").strip()
+    zone = (body.get("zone") or "public").strip()
+    if not username or not role_name:
+        raise HTTPException(400, "登录账号与岗位名必填")
+    if db.query_one("SELECT id FROM users WHERE username=%s", (username,)):
+        raise HTTPException(400, "登录账号已存在")
+    wl = warzone_lookup()
+    w = wl.get(zone) or next(iter(wl.values()), {"name": "公众战区", "color": "#1565c0"})
+    import secrets as _s
+    salt = _s.token_hex(8)
+    pwd = (body.get("password") or "123456").strip()
+    h = hashlib.sha256((pwd + salt).encode()).hexdigest()
+    nid = db.execute(
+        "INSERT INTO users(username,name,role_id,role_name,phone,password_hash,password_salt,"
+        "zone,zone_name,color,is_admin) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (username, body.get("name") or role_name, username, role_name, body.get("phone", ""),
+         h, salt, zone, w["name"], w["color"], 1 if body.get("is_admin") else 0))
+    return {"ok": True, "id": nid}
+
+
+@app.put("/api/admin/users/{uid}")
+async def admin_update_user(uid: int, request: Request):
+    """编辑人员（支持改密码/电话/姓名/战区/管理员标记）"""
+    require_admin(request)
+    body = await request.json()
+    cur = db.query_one("SELECT * FROM users WHERE id=%s", (uid,))
+    if not cur:
+        raise HTTPException(404, "人员不存在")
+    name = body.get("name", cur["name"])
+    phone = body.get("phone", cur["phone"])
+    is_admin = 1 if body.get("is_admin") else 0
+    zone = body.get("zone", cur["zone"])
+    wl = warzone_lookup()
+    w = wl.get(zone)
+    zone_name = w["name"] if w else cur["zone_name"]
+    color = w["color"] if w else cur["color"]
+    role_name = body.get("role_name", cur["role_name"])
+    if body.get("password"):
+        salt = secrets.token_hex(8)
+        h = hashlib.sha256((body["password"] + salt).encode()).hexdigest()
+        db.execute("UPDATE users SET name=%s,phone=%s,role_name=%s,zone=%s,zone_name=%s,color=%s,"
+                   "is_admin=%s,password_hash=%s,password_salt=%s WHERE id=%s",
+                   (name, phone, role_name, zone, zone_name, color, is_admin, h, salt, uid))
+    else:
+        db.execute("UPDATE users SET name=%s,phone=%s,role_name=%s,zone=%s,zone_name=%s,color=%s,"
+                   "is_admin=%s WHERE id=%s",
+                   (name, phone, role_name, zone, zone_name, color, is_admin, uid))
+    return {"ok": True}
+
+
+@app.delete("/api/admin/users/{uid}")
+async def admin_delete_user(uid: int, request: Request):
+    """停用人员（软删除，保留数据可追溯）"""
+    s = require_admin(request)
+    if str(uid) == str(db.query_one("SELECT id FROM users WHERE username=%s", (s["username"],))["id"]):
+        raise HTTPException(400, "不能停用自己")
+    db.execute("UPDATE users SET is_active=0 WHERE id=%s", (uid,))
+    return {"ok": True}
+
+
+# ---- 权限分配 ----
+@app.get("/api/admin/access")
+async def admin_get_access(request: Request, role_id: str = ""):
+    """查询某角色（或全部）的权限矩阵"""
+    require_admin(request)
+    battles = db.query_all("SELECT * FROM battles ORDER BY sort_order")
+    warzones = db.query_all("SELECT * FROM warzones ORDER BY sort_order")
+    if role_id:
+        rules = db.query_all("SELECT battle_id,warzone_id FROM role_access WHERE role_id=%s", (role_id,))
+    else:
+        rules = db.query_all("SELECT role_id,battle_id,warzone_id FROM role_access")
+    granted = set()
+    for r in rules:
+        if role_id:
+            granted.add((r["battle_id"], r["warzone_id"]))
+    # 角色清单（去重）
+    roles = db.query_all(
+        "SELECT DISTINCT role_id,role_name,zone_name FROM users WHERE is_admin=0 ORDER BY zone_name,role_name")
+    return {
+        "battles": battles, "warzones": warzones, "roles": roles,
+        "granted": [[g[0], g[1]] for g in granted] if role_id else rules,
+    }
+
+
+@app.put("/api/admin/access")
+async def admin_set_access(request: Request):
+    """批量设置某角色的可见板块（覆盖式）"""
+    require_admin(request)
+    body = await request.json()
+    role_id = body.get("role_id")
+    grants = body.get("grants", [])  # [{battle_id, warzone_id}, ...]
+    if not role_id:
+        raise HTTPException(400, "role_id 必填")
+    db.execute("DELETE FROM role_access WHERE role_id=%s", (role_id,))
+    if grants:
+        db.executemany("INSERT IGNORE INTO role_access(role_id,battle_id,warzone_id) VALUES(%s,%s,%s)",
+                       [(role_id, g["battle_id"], g["warzone_id"]) for g in grants])
+    return {"ok": True, "granted": len(grants)}
+
+
+# ---- 板块记录管理 ----
+@app.get("/api/admin/record-schema")
+async def admin_record_schema(request: Request):
+    """记录字段定义（前端据此渲染编辑表单）"""
+    require_admin(request)
+    return {"fields": [{"key": k, "label": l, "type": t} for k, l, t in RECORD_FIELDS],
+            "battles": db.query_all("SELECT * FROM battles ORDER BY sort_order"),
+            "warzones": db.query_all("SELECT * FROM warzones ORDER BY sort_order")}
+
+
+@app.get("/api/admin/records")
+async def admin_records(request: Request, battle_id: str = "", zone_id: str = ""):
+    """记录列表（支持战役/战区筛选）"""
+    require_admin(request)
+    sql = "SELECT * FROM deployment_records WHERE 1=1"
+    args = []
+    if battle_id:
+        sql += " AND battle_id=%s"; args.append(battle_id)
+    if zone_id:
+        sql += " AND warzone_id=%s"; args.append(zone_id)
+    sql += " ORDER BY battle_id, warzone_id, sort_order, id"
+    rows = db.query_all(sql, args)
+    return {"total": len(rows), "records": rows}
+
+
+@app.post("/api/admin/records")
+async def admin_create_record(request: Request):
+    """新增记录"""
+    s = require_admin(request)
+    body = await request.json()
+    data = {k: (body.get(k, "") or "") for k in RECORD_DB_COLS}
+    bname = (data.get("battle_name") or "").replace("（例）", "").strip()
+    zname = (data.get("warzone_name") or "").strip()
+    bid = _battle_id(bname); zid = _warzone_id(zname)
+    max_sort = db.query_one(
+        "SELECT COALESCE(MAX(sort_order),0) m FROM deployment_records")["m"]
+    nid = db.execute(
+        f"INSERT INTO deployment_records(battle_id,warzone_id,{','.join(RECORD_DB_COLS)},sort_order,updated_by) "
+        f"VALUES(%s,%s,{','.join(['%s']*len(RECORD_DB_COLS))},%s,%s)",
+        [bid, zid] + [data[k] for k in RECORD_DB_COLS] + [max_sort + 1, s["username"]])
+    return {"ok": True, "id": nid}
+
+
+@app.put("/api/admin/records/{rid}")
+async def admin_update_record(rid: int, request: Request):
+    """编辑记录"""
+    s = require_admin(request)
+    body = await request.json()
+    if not db.query_one("SELECT id FROM deployment_records WHERE id=%s", (rid,)):
+        raise HTTPException(404, "记录不存在")
+    data = {k: (body.get(k, "") or "") for k in RECORD_DB_COLS}
+    bname = (data.get("battle_name") or "").replace("（例）", "").strip()
+    zname = (data.get("warzone_name") or "").strip()
+    bid = _battle_id(bname); zid = _warzone_id(zname)
+    sets = ", ".join(f"{c}=%s" for c in RECORD_DB_COLS)
+    db.execute(
+        f"UPDATE deployment_records SET battle_id=%s,warzone_id=%s,{sets},updated_by=%s WHERE id=%s",
+        [bid, zid] + [data[k] for k in RECORD_DB_COLS] + [s["username"], rid])
+    return {"ok": True}
+
+
+@app.delete("/api/admin/records/{rid}")
+async def admin_delete_record(rid: int, request: Request):
+    require_admin(request)
+    db.execute("DELETE FROM deployment_records WHERE id=%s", (rid,))
+    return {"ok": True}
+
+
+def _battle_id(name: str) -> Optional[str]:
+    if not name:
+        return None
+    r = db.query_one("SELECT id FROM battles WHERE name=%s", (name,))
+    if r:
+        return r["id"]
+    r = db.query_one("SELECT id FROM battles WHERE name LIKE %s OR %s LIKE CONCAT(name,'%%')", (f"{name}%", name))
+    return r["id"] if r else None
+
+
+def _warzone_id(name: str) -> Optional[str]:
+    if not name:
+        return None
+    r = db.query_one("SELECT id FROM warzones WHERE name=%s", (name,))
+    return r["id"] if r else None
 
 
 if __name__ == "__main__":

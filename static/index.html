@@ -50,6 +50,8 @@ body>*{position:relative;z-index:1}
 .role-badge{padding:4px 18px;border-radius:3px;font-size:13px;font-weight:700;color:#F0E6D8;letter-spacing:1px;background:linear-gradient(135deg,rgba(139,26,26,.6),rgba(192,57,43,.5));border:1px solid rgba(139,26,26,.3)}
 .btn-logout{padding:5px 16px;border:1px solid rgba(240,230,216,.25);border-radius:3px;background:transparent;color:rgba(240,230,216,.6);cursor:pointer;font-size:12px;font-family:inherit;transition:all .25s;letter-spacing:1px}
 .btn-logout:hover{border-color:var(--cinnabar);color:var(--cinnabar)}
+.btn-admin{padding:5px 16px;border:1px solid rgba(192,57,43,.5);border-radius:3px;background:linear-gradient(135deg,rgba(139,26,26,.35),rgba(192,57,43,.25));color:#F0E6D8;cursor:pointer;font-size:12px;font-family:inherit;transition:all .25s;letter-spacing:2px;margin-right:8px;font-weight:700}
+.btn-admin:hover{background:linear-gradient(135deg,rgba(139,26,26,.6),rgba(192,57,43,.5));box-shadow:0 2px 10px rgba(139,26,26,.35);transform:translateY(-1px)}
 
 /* 通用：子页面头部 */
 .sub-header{background:linear-gradient(160deg,#0d0d1a,#1a1a2e,#1C2833);padding:16px 28px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;flex-wrap:wrap}
@@ -191,7 +193,7 @@ body>*{position:relative;z-index:1}
 <div class="page page-main" id="pageMain">
   <div class="header-bar"><div class="header-inner">
     <div class="header-title">百日攻坚"夏收"行动部署看板</div>
-    <div class="header-user"><span class="zone-badge" id="mainZoneBadge"></span><span class="role-badge" id="mainRoleBadge"></span><button class="btn-logout" onclick="doLogout()">退出</button></div>
+    <div class="header-user"><span class="zone-badge" id="mainZoneBadge"></span><span class="role-badge" id="mainRoleBadge"></span><button class="btn-admin" id="btnAdmin" style="display:none" onclick="openAdmin()">管理后台</button><button class="btn-logout" onclick="doLogout()">退出</button></div>
   </div></div>
   <div class="main-body">
     <div class="section-label">六大战役</div><div class="card-grid-3" id="mainBattleGrid"></div>
@@ -242,47 +244,19 @@ body>*{position:relative;z-index:1}
 </div>
 
 <script>
-const WARZONES=[
-  {id:"public",name:"公众战区",color:"#1565c0",roles:["分局长（公）","直销","工程师（公）","营业员","存量专员","渠道经理"]},
-  {id:"business",name:"商业战区",color:"#2e7d32",roles:["分局长（商）","客户经理（商）","特战队","工程师（商）"]},
-  {id:"education",name:"教科战区",color:"#7b1fa2",roles:["分局长（校）","客户经理（校）"]},
-  {id:"industry",name:"行业战区",color:"#e65100",roles:["分局长（行）","客户经理（行）"]},
-];
-const BATTLES=[
-  {id:"b1",name:"一号工程战",color:"#c62828"},
-  {id:"b2",name:"百万加装战",color:"#1565c0"},
-  {id:"b3",name:"高价值新增战",color:"#2e7d32"},
-  {id:"b4",name:"双线+标准ICT固本战",color:"#7b1fa2"},
-  {id:"b5",name:"项目掘金战",color:"#e65100"},
-  {id:"b6",name:"细分市场战",color:"#00838f"},
-];
-const ROLES_LIST=[
-  {id:"总经理",name:"总经理",zone:"all",zone_name:"全部战区",color:"#8B1A1A"},
-  {id:"分局长（公）",name:"分局长（公）",zone:"public",zone_name:"公众战区",color:"#1565c0"},
-  {id:"直销",name:"直销",zone:"public",zone_name:"公众战区",color:"#1565c0"},
-  {id:"工程师（公）",name:"工程师（公）",zone:"public",zone_name:"公众战区",color:"#1565c0"},
-  {id:"营业员",name:"营业员",zone:"public",zone_name:"公众战区",color:"#1565c0"},
-  {id:"存量专员",name:"存量专员",zone:"public",zone_name:"公众战区",color:"#1565c0"},
-  {id:"渠道经理",name:"渠道经理",zone:"public",zone_name:"公众战区",color:"#1565c0"},
-  {id:"分局长（商）",name:"分局长（商）",zone:"business",zone_name:"商业战区",color:"#2e7d32"},
-  {id:"客户经理（商）",name:"客户经理（商）",zone:"business",zone_name:"商业战区",color:"#2e7d32"},
-  {id:"特战队",name:"特战队",zone:"business",zone_name:"商业战区",color:"#2e7d32"},
-  {id:"工程师（商）",name:"工程师（商）",zone:"business",zone_name:"商业战区",color:"#2e7d32"},
-  {id:"分局长（校）",name:"分局长（校）",zone:"education",zone_name:"教科战区",color:"#7b1fa2"},
-  {id:"客户经理（校）",name:"客户经理（校）",zone:"education",zone_name:"教科战区",color:"#7b1fa2"},
-  {id:"分局长（行）",name:"分局长（行）",zone:"industry",zone_name:"行业战区",color:"#e65100"},
-  {id:"客户经理（行）",name:"客户经理（行）",zone:"industry",zone_name:"行业战区",color:"#e65100"},
-];
-
 let TOKEN='',ROLE=null;
 
-(function(){
-  const sel=document.getElementById('selRole'),groups={};
-  ROLES_LIST.forEach(r=>{const g=r.zone==='all'?'管理层':r.zone_name;if(!groups[g])groups[g]=[];groups[g].push(r);});
-  ['管理层','公众战区','商业战区','教科战区','行业战区'].forEach(g=>{
-    if(!groups[g])return;const og=document.createElement('optgroup');og.label=g;
-    groups[g].forEach(r=>{const o=document.createElement('option');o.value=r.id;o.text=r.name;og.appendChild(o);});sel.appendChild(og);
-  });
+/* 角色列表从后端动态拉取（不再硬编码），含电话等字段暂不在登录页展示 */
+(async function(){
+  const sel=document.getElementById('selRole');
+  try{
+    const res=await fetch('/api/roles');
+    const groups=await res.json();
+    ['管理层','公众战区','商业战区','教科战区','行业战区'].forEach(g=>{
+      if(!groups[g])return;const og=document.createElement('optgroup');og.label=g;
+      groups[g].forEach(r=>{const o=document.createElement('option');o.value=r.id;o.text=r.name;og.appendChild(o);});sel.appendChild(og);
+    });
+  }catch(e){sel.innerHTML='<option>角色加载失败</option>'}
 })();
 document.getElementById('txtPwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
@@ -294,6 +268,7 @@ function showPage(name){
   if(el)el.style.display='block';window.scrollTo(0,0);
 }
 function goMain(){showPage('main');}
+function openAdmin(){window.open('/admin?token='+encodeURIComponent(TOKEN),'_blank');}
 
 async function doLogin(){
   const rid=document.getElementById('selRole').value,pwd=document.getElementById('txtPwd').value;
@@ -316,6 +291,7 @@ async function loadMainPage(){
   document.getElementById('mainRoleBadge').style.background='linear-gradient(135deg,rgba(139,26,26,.6),rgba(192,57,43,.5))';
   document.getElementById('mainZoneBadge').textContent=ROLE.zone_name;
   document.getElementById('mainZoneBadge').style.background=ROLE.color+'44';
+  document.getElementById('btnAdmin').style.display=ROLE.is_admin?'inline-block':'none';
   try{
     const res=await fetch('/api/overview?token='+TOKEN);
     if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
