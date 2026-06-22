@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  # ---- MySQL ----
+  mysql:
+    image: mysql:8.0
+    container_name: xiashou-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    ports:
+      - "127.0.0.1:3306:3306"   # 仅本机可连，不对外暴露
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --max-connections=200
+      --innodb-buffer-pool-size=256M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---- FastAPI 应用 ----
+  app:
+    build: .
+    container_name: xiashou-app
+    restart: always
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_POOL_MIN: 4
+      DB_POOL_MAX: 20
+      UVICORN_WORKERS: 4
+    ports:
+      - "127.0.0.1:8000:8000"   # 仅本机，nginx代理
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ---- Nginx 反向代理 ----
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: xiashou-nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+volumes:
+  mysql_data:

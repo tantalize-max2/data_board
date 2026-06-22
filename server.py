@@ -11,7 +11,7 @@
 API 兼容：原有 6 个业务接口签名不变，前端无需改动调用方式。
 新增：/api/roles, /api/admin/* 一组管理接口。
 """
-import os, hashlib, time, secrets
+import os, hashlib, time, secrets, threading
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, FileResponse
@@ -28,6 +28,40 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 # ====== 会话（内存，TTL 8 小时）======
 SESSIONS: Dict[str, dict] = {}
 SESSION_TTL = 3600 * 8
+# 每 10 分钟清理过期会话
+def _clean_sessions():
+    now = time.time()
+    expired = [k for k, v in SESSIONS.items() if now > v["expire"]]
+    for k in expired:
+        SESSIONS.pop(k, None)
+    threading.Timer(600, _clean_sessions).start()
+_clean_sessions()
+
+# ====== 简易内存缓存（线程安全）======
+_CACHE: Dict[str, tuple] = {}  # key → (value, expire_time)
+_CACHE_LOCK = threading.Lock()
+
+def cache_get(key: str, ttl: int = 60):
+    with _CACHE_LOCK:
+        item = _CACHE.get(key)
+        if item and time.time() < item[1]:
+            return item[0]
+        _CACHE.pop(key, None)
+    return None
+
+def cache_set(key: str, value, ttl: int = 60):
+    with _CACHE_LOCK:
+        _CACHE[key] = (value, time.time() + ttl)
+
+def cache_invalidate(prefix: str = ""):
+    """使以 prefix 开头的所有缓存失效"""
+    with _CACHE_LOCK:
+        if not prefix:
+            _CACHE.clear()
+        else:
+            keys = [k for k in _CACHE if k.startswith(prefix)]
+            for k in keys:
+                del _CACHE[k]
 
 
 # ====== 认证辅助 ======
@@ -135,11 +169,21 @@ def get_role_rows(s: dict) -> List[dict]:
 
 
 def battle_lookup() -> Dict[str, dict]:
-    return {b["id"]: b for b in db.query_all("SELECT * FROM battles ORDER BY sort_order")}
+    v = cache_get("battles", 120)
+    if v is not None:
+        return v
+    v = {b["id"]: b for b in db.query_all("SELECT * FROM battles ORDER BY sort_order")}
+    cache_set("battles", v, 120)
+    return v
 
 
 def warzone_lookup() -> Dict[str, dict]:
-    return {w["id"]: w for w in db.query_all("SELECT * FROM warzones ORDER BY sort_order")}
+    v = cache_get("warzones", 120)
+    if v is not None:
+        return v
+    v = {w["id"]: w for w in db.query_all("SELECT * FROM warzones ORDER BY sort_order")}
+    cache_set("warzones", v, 120)
+    return v
 
 
 def group_paths(rows: List[dict]) -> List[dict]:
@@ -234,13 +278,13 @@ def get_scenes(rows: List[dict], path_no: str) -> List[dict]:
 
 # ====== 页面 ======
 @app.get("/")
-async def index():
+def index():
     with open(os.path.join(BASE_DIR, "static", "index.html"), encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 
 @app.get("/admin")
-async def admin_page():
+def admin_page():
     p = os.path.join(BASE_DIR, "static", "admin.html")
     if os.path.exists(p):
         with open(p, encoding="utf-8") as f:
@@ -250,7 +294,7 @@ async def admin_page():
 
 # ====== 公开 API ======
 @app.get("/api/roles")
-async def roles():
+def roles():
     """登录页角色下拉数据源（含电话字段，暂不展示）"""
     rows = db.query_all(
         "SELECT username,role_id,role_name,zone,zone_name,color,is_admin "
@@ -295,7 +339,7 @@ async def logout(request: Request):
 
 
 @app.get("/api/me")
-async def me(request: Request):
+def me(request: Request):
     """当前登录人信息（前端可据此判断是否显示管理入口）"""
     s = require_session(request)
     return get_user_info(s["username"])
@@ -304,7 +348,7 @@ async def me(request: Request):
 # ====== 业务 API（保持原前端契约）======
 
 @app.get("/api/overview")
-async def overview(request: Request):
+def overview(request: Request):
     """主页概览：该角色有数据的战役和战区"""
     s = require_session(request)
     rows = get_role_rows(s)
@@ -328,11 +372,16 @@ async def overview(request: Request):
         zid = r.get("warzone_id")
         if zid:
             zcount[zid] = zcount.get(zid, 0) + 1
+    # 一次查询所有战区角色，替代 N+1 循环查询
+    zone_roles_map: Dict[str, List[str]] = {}
+    for u in db.query_all("SELECT zone, role_name FROM users WHERE is_active=1 AND is_admin=0"):
+        zone_roles_map.setdefault(u["zone"], []).append(u["role_name"])
     for zid, cnt in zcount.items():
         w = wl.get(zid)
         if w:
-            roles = [u["role_name"] for u in db.query_all(
-                "SELECT DISTINCT role_name FROM users WHERE zone=%s AND is_active=1 AND is_admin=0", (zid,))]
+            # 去重
+            seen = set()
+            roles = [r for r in zone_roles_map.get(zid, []) if not (r in seen or seen.add(r))]
             zone_stats.append({"id": w["id"], "name": w["name"], "color": w["color"],
                                "count": cnt, "roles": roles})
 
@@ -341,7 +390,7 @@ async def overview(request: Request):
 
 
 @app.get("/api/search")
-async def search(request: Request, keyword: str = ""):
+def search(request: Request, keyword: str = ""):
     """按指导角色/作战角色检索部署记录（结果按当前用户权限过滤）"""
     s = require_session(request)
     kw = (keyword or "").strip()
@@ -376,7 +425,7 @@ async def search(request: Request, keyword: str = ""):
 
 
 @app.get("/api/role-battles/{role_name}")
-async def role_battles(role_name: str, request: Request):
+def role_battles(role_name: str, request: Request):
     """查看某角色的战役信息（兵种标签点击）
     兵种标签显示 users.role_name：
     - 分局长/客户经理：通过战区自动权限查本战区全部数据
@@ -443,7 +492,7 @@ async def role_battles(role_name: str, request: Request):
 
 
 @app.get("/api/battle-zones/{battle_id}")
-async def battle_zones(battle_id: str, request: Request):
+def battle_zones(battle_id: str, request: Request):
     """战役子页面：该战役下有哪些战区有数据"""
     s = require_session(request)
     rows = get_role_rows(s)
@@ -469,7 +518,7 @@ async def battle_zones(battle_id: str, request: Request):
 
 
 @app.get("/api/zone-battles/{zone_id}")
-async def zone_battles(zone_id: str, request: Request):
+def zone_battles(zone_id: str, request: Request):
     """战区子页面：该战区下有哪些战役有数据"""
     s = require_session(request)
     rows = get_role_rows(s)
@@ -499,7 +548,7 @@ async def zone_battles(zone_id: str, request: Request):
 
 
 @app.get("/api/detail/{battle_id}/{zone_id}")
-async def cross_detail(battle_id: str, zone_id: str, request: Request):
+def cross_detail(battle_id: str, zone_id: str, request: Request):
     """数据详情：战役+战区交叉过滤"""
     s = require_session(request)
     rows = get_role_rows(s)
@@ -520,7 +569,7 @@ async def cross_detail(battle_id: str, zone_id: str, request: Request):
 
 
 @app.get("/api/path-detail/{battle_id}/{zone_id}/{path_id}")
-async def path_detail(battle_id: str, zone_id: str, path_id: str, request: Request):
+def path_detail(battle_id: str, zone_id: str, path_id: str, request: Request):
     """路径详情：场景列表"""
     s = require_session(request)
     rows = get_role_rows(s)
@@ -573,7 +622,7 @@ RECORD_DB_COLS = [f[0] for f in RECORD_FIELDS]
 
 
 @app.get("/api/admin/dashboard")
-async def admin_dashboard(request: Request):
+def admin_dashboard(request: Request):
     """管理首页统计"""
     require_admin(request)
     u_total = db.query_one("SELECT COUNT(*) c FROM users WHERE is_active=1")["c"]
@@ -593,7 +642,7 @@ async def admin_dashboard(request: Request):
 
 # ---- 人员管理 ----
 @app.get("/api/admin/users")
-async def admin_users(request: Request, q: str = "", zone: str = ""):
+def admin_users(request: Request, q: str = "", zone: str = ""):
     """人员列表（支持关键词 q 与战区过滤）"""
     require_admin(request)
     sql = ("SELECT id,username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_active,"
@@ -679,7 +728,7 @@ async def admin_delete_user(uid: int, request: Request):
 
 # ---- 权限分配 ----
 @app.get("/api/admin/access")
-async def admin_get_access(request: Request, role_id: str = ""):
+def admin_get_access(request: Request, role_id: str = ""):
     """查询某角色（或全部）的权限矩阵"""
     require_admin(request)
     battles = db.query_all("SELECT * FROM battles ORDER BY sort_order")
@@ -719,7 +768,7 @@ async def admin_set_access(request: Request):
 
 # ---- 板块记录管理 ----
 @app.get("/api/admin/record-schema")
-async def admin_record_schema(request: Request):
+def admin_record_schema(request: Request):
     """记录字段定义（前端据此渲染编辑表单）"""
     require_admin(request)
     return {"fields": [{"key": k, "label": l, "type": t} for k, l, t in RECORD_FIELDS],
@@ -728,7 +777,7 @@ async def admin_record_schema(request: Request):
 
 
 @app.get("/api/admin/records")
-async def admin_records(request: Request, battle_id: str = "", zone_id: str = ""):
+def admin_records(request: Request, battle_id: str = "", zone_id: str = ""):
     """记录列表（支持战役/战区筛选）"""
     require_admin(request)
     sql = "SELECT * FROM deployment_records WHERE 1=1"

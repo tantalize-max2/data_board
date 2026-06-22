@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """数据库连接池与查询辅助
 所有 SQL 操作统一走这里，便于管理与事务控制。
+
+配置通过环境变量注入，本地开发可用 .env 文件或默认值。
 """
+import os
 import pymysql
 from dbutils.pooled_db import PooledDB
 
+# ---- 本地开发 SSL 补丁（Linux 服务器无需，但保留无副作用）----
 import ssl as _ssl
-
-# 解决 Anaconda 环境 Windows 证书库损坏导致 SSL 报错的问题
-# pymysql 连接时会调用 ssl.create_default_context() 加载系统证书，
-# 部分环境下证书损坏会抛 SSLError，此处 monkey-patch 为容错版本。
 _orig_ctx = _ssl.create_default_context
 def _safe_create_default_context(*a, **kw):
     try:
@@ -21,11 +21,26 @@ def _safe_create_default_context(*a, **kw):
         return ctx
 _ssl.create_default_context = _safe_create_default_context
 
-DB_CONFIG = dict(host='127.0.0.1', user='root', password='root',
-                 database='xiashou2', charset='utf8mb4', autocommit=True)
+# ---- 数据库配置（环境变量 > 默认值）----
+DB_CONFIG = dict(
+    host=os.getenv('DB_HOST', '127.0.0.1'),
+    port=int(os.getenv('DB_PORT', 3306)),
+    user=os.getenv('DB_USER', 'root'),
+    password=os.getenv('DB_PASSWORD', 'root'),
+    database=os.getenv('DB_DATABASE', 'xiashou2'),
+    charset='utf8mb4',
+    autocommit=True,
+)
 
-_pool = PooledDB(creator=pymysql, mincached=2, maxcached=8, maxconnections=20,
-                 blocking=True, **DB_CONFIG)
+_pool = PooledDB(
+    creator=pymysql,
+    mincached=int(os.getenv('DB_POOL_MIN', '4')),
+    maxcached=int(os.getenv('DB_POOL_MAX', '20')),
+    maxconnections=int(os.getenv('DB_POOL_MAX_CONN', '50')),
+    blocking=True,
+    ping=1,  # 连接使用前自动检测是否断开
+    **DB_CONFIG
+)
 
 
 def get_conn():
