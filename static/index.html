@@ -426,6 +426,66 @@ body>*{position:relative;z-index:1}
 .empty-state{text-align:center;padding:60px 20px;color:var(--text-dim);font-size:14px;letter-spacing:3px}
 .loading{text-align:center;padding:40px;color:var(--text-dim);font-size:13px;letter-spacing:1px}
 
+/* ---- 悬停预览浮层 ---- */
+.hover-tip{position:fixed;z-index:2000;max-width:500px;max-height:420px;overflow-y:auto;
+  background:linear-gradient(170deg,var(--bg-panel),var(--bg-dark));
+  border:1px solid var(--border-hover);border-radius:6px;padding:16px 20px;
+  box-shadow:0 0 40px rgba(0,212,255,.12),0 12px 40px rgba(0,0,0,.5);
+  display:none;font-size:12px;line-height:1.7}
+.hover-tip.show{display:block;animation:fadeIn .15s}
+.hover-tip::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),var(--blue),var(--cyan),transparent)}
+.hover-tip .ht-title{font-weight:700;color:var(--cyan);font-size:13px;margin-bottom:8px;
+  letter-spacing:1px;padding-bottom:6px;border-bottom:1px solid var(--divider)}
+.hover-tip .ht-row{display:flex;gap:8px;padding:3px 0}
+.hover-tip .ht-label{flex-shrink:0;color:var(--cyan);font-weight:500;min-width:100px}
+.hover-tip .ht-val{color:#fff;word-break:break-all}
+.hover-tip .ht-empty{color:var(--text-dim);font-style:italic}
+.hover-tip .ht-item{background:rgba(0,212,255,.06);border:1px solid var(--border);
+  border-radius:4px;padding:8px 12px;margin-bottom:6px}
+.hover-tip .ht-item-name{font-weight:700;color:var(--cyan);margin-bottom:4px}
+
+/* ---- 场景模块（场景列表页） ---- */
+.scene-module{background:var(--bg-card);border:1px solid var(--border-hover);border-radius:var(--radius);
+  padding:20px 22px;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
+.scene-module::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue),var(--cyan));opacity:.5;transition:opacity .3s}
+.scene-module:hover{border-color:var(--border-active);
+  box-shadow:0 0 24px var(--cyan-glow),0 8px 24px rgba(0,0,0,.3);transform:translateY(-3px)}
+.scene-module:hover::before{opacity:1}
+.scene-module .sm-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.scene-module .sm-id{font-family:var(--font-display);font-size:20px;color:var(--cyan);opacity:.4;line-height:1}
+.scene-module .sm-name{font-size:16px;font-weight:900;color:#fff;letter-spacing:1px;flex:1;
+  text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.scene-module .sm-fields{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}
+.scene-module .sm-field{display:flex;gap:6px;align-items:flex-start}
+.scene-module .sm-flabel{flex-shrink:0;font-size:11px;color:var(--cyan);font-weight:500;white-space:nowrap}
+.scene-module .sm-fval{font-size:12px;color:#fff;word-break:break-all}
+.scene-module .sm-fval.empty{color:var(--text-dim)}
+
+/* ---- 单元模块（场景详情页） ---- */
+.unit-module{background:var(--bg-card);border:1px solid var(--border-hover);border-radius:var(--radius);
+  padding:18px 20px;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
+.unit-module::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue));opacity:.5;transition:opacity .3s}
+.unit-module:hover{border-color:var(--border-active);
+  box-shadow:0 0 20px var(--cyan-glow),0 6px 20px rgba(0,0,0,.3);transform:translateY(-2px)}
+.unit-module:hover::before{opacity:1}
+.unit-module .um-label{font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:8px;
+  letter-spacing:1px;text-shadow:0 0 6px var(--cyan-glow)}
+.unit-module .um-value{font-size:13px;color:#fff;line-height:1.6;word-break:break-all;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.unit-module .um-value.empty{color:var(--text-dim);font-style:italic}
+.unit-module .um-arrow{position:absolute;right:16px;top:50%;transform:translateY(-50%);
+  font-size:14px;opacity:.2;color:var(--cyan);transition:all .3s}
+.unit-module:hover .um-arrow{opacity:.6}
+
+.unit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.unit-detail-card{background:var(--bg-card);border:1px solid var(--border-hover);border-radius:var(--radius);
+  padding:24px 28px;box-shadow:var(--shadow-panel);position:relative;overflow:hidden}
+.unit-detail-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--blue),var(--cyan));opacity:.6}
+
 /* ---- 响应式 ---- */
 @media(max-width:1100px){.path-grid{grid-template-columns:minmax(300px,1fr)}.scene-grid{grid-template-columns:minmax(340px,1fr)}}
 @media(max-width:900px){
@@ -507,7 +567,7 @@ body>*{position:relative;z-index:1}
   <div class="sub-body" id="detailBody"></div>
 </div>
 
-<!-- 路径→场景详情页 -->
+<!-- 路径→场景列表页 -->
 <div class="page page-path" id="pagePath">
   <div class="sub-header">
     <button class="back-btn" onclick="goMain()">&#8592; 主页</button>
@@ -515,6 +575,26 @@ body>*{position:relative;z-index:1}
     <div class="sub-info" id="pathInfo"></div>
   </div>
   <div class="sub-body" id="pathBody"></div>
+</div>
+
+<!-- 场景详情页（10个单元模块） -->
+<div class="page page-scene" id="pageScene">
+  <div class="sub-header">
+    <button class="back-btn" onclick="goMain()">&#8592; 主页</button>
+    <div class="breadcrumb" id="sceneBreadcrumb"></div>
+    <div class="sub-info" id="sceneInfo"></div>
+  </div>
+  <div class="sub-body" id="sceneBody"></div>
+</div>
+
+<!-- 单元信息展示页 -->
+<div class="page page-unit" id="pageUnit">
+  <div class="sub-header">
+    <button class="back-btn" onclick="goMain()">&#8592; 主页</button>
+    <div class="breadcrumb" id="unitBreadcrumb"></div>
+    <div class="sub-info" id="unitInfo"></div>
+  </div>
+  <div class="sub-body" id="unitBody"></div>
 </div>
 
 <script>
@@ -730,7 +810,8 @@ function renderDetailPage(data){
   if(data.paths&&data.paths.length){
     h+=`<div class="module-section"><div class="module-title">路径</div><div class="path-grid">`;
     data.paths.forEach(p=>{
-      h+=`<div class="path-card" onclick="openPath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}')">
+      const ck=data.battle.id+'|'+data.zone.id+'|'+p.path_id;
+      h+=`<div class="path-card" onclick="openPath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}')" onmouseenter="hoverPathScenes(event,'${ck}','${esc(p.path_name)}')" onmouseleave="hideHoverPreview()">
         <div class="path-name">${esc(p.path_name)}</div>
         <div class="path-target">${p.path_target?esc(p.path_target):'暂无路径目标'}</div>
         <div class="path-meta"><span class="path-id">编号 ${esc(p.path_id)}</span><span class="path-scenes">${p.scene_count}个场景</span></div>
@@ -743,7 +824,9 @@ function renderDetailPage(data){
   el.innerHTML=h;
 }
 
-/* ====== 路径→场景详情 ====== */
+/* ====== 路径→场景列表页 ====== */
+let SCENE_CACHE={}; /* key: bid|zid|pid → {path,battle,zone,scenes} */
+
 async function openPath(bid,zid,pid){
   showPage('path');
   document.getElementById('pathBreadcrumb').innerHTML='<span class="loading">加载中...</span>';
@@ -753,6 +836,7 @@ async function openPath(bid,zid,pid){
     const res=await fetch('/api/path-detail/'+bid+'/'+zid+'/'+encodeURIComponent(pid)+'?token='+TOKEN);
     if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
     const data=await res.json();
+    SCENE_CACHE[bid+'|'+zid+'|'+pid]=data; /* 缓存供场景详情页使用 */
     const bc=document.getElementById('pathBreadcrumb');
     bc.innerHTML=`
       <span class="crumb" onclick="openBattleZones('${bid}')">${esc(data.battle.name)}</span>
@@ -767,34 +851,235 @@ async function openPath(bid,zid,pid){
   }catch(e){document.getElementById('pathBody').innerHTML='<div class="empty-state">加载失败</div>';}
 }
 
+/* 渲染场景列表页：顶部信息卡 + 可点击场景模块 */
 function renderPathPage(data){
   const el=document.getElementById('pathBody');let h='';
 
-  if(data.path){
-    h+=`<div class="module-section"><div class="module-title">路径信息</div><div class="info-card"><div class="card-fields">`;
-    [['路径编号','path_id'],['路径','path_name'],['路径目标','path_target']].forEach(([label,key])=>{
-      const v=(data.path[key]||'').trim();
-      h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
-    });
-    h+=`</div></div></div>`;
-  }
+  /* 顶部信息卡：战役 / 战区 / 路径 */
+  h+=`<div class="module-section"><div class="module-title">路径信息</div><div class="info-card"><div class="card-fields">`;
+  const bname=data.battle?.name||'---',zname=data.zone?.name||'---';
+  [['战役',()=>bname],['战区',()=>zname],['路径编号',()=>data.path?.path_id||'---'],['路径',()=>data.path?.path_name||'---'],['路径目标',()=>data.path?.path_target||'---']].forEach(([label,fn])=>{
+    const v=(fn()||'').trim();
+    h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
+  });
+  h+=`</div></div></div>`;
 
+  /* 场景模块列表 */
   if(data.scenes&&data.scenes.length){
     h+=`<div class="module-section"><div class="module-title">场景</div><div class="scene-grid">`;
-    data.scenes.forEach(s=>{
+    const ck=data.battle.id+'|'+data.zone.id+'|'+(data.path?.path_id||'');
+    data.scenes.forEach((s,idx)=>{
       const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名场景';
-      h+=`<div class="scene-card"><div class="scene-header"><span class="scene-id">${esc(s['场景编号'])}</span><span class="scene-name">${esc(sceneTitle)}</span></div><div class="scene-fields">`;
-      [['场景名称','场景名称'],['场景（对到话术、作战角色）','场景（对到话术、作战角色）'],['政策','政策'],['激励','激励'],['标准话术','标准话术'],['商机来源','商机来源'],['最短管控周期','最短管控周期'],['最短管控动作（量）','最短管控动作（量）'],['最短管控目标（积分/金额）','最短管控目标（积分/金额）'],['闭环管控','闭环管控']].forEach(([label,key])=>{
-        const v=(s[key]||'').trim();
-        h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
-      });
-      h+=`</div></div>`;
+      const guide=s['指导角色（营销统筹/专员）']||'',combat=s['作战角色']||'';
+      const source=s['商机来源']||'',cycle=s['最短管控周期']||'';
+      h+=`<div class="scene-module" onclick="openScene('${ck}',${idx})" onmouseenter="hoverSceneInfo(event,'${ck}',${idx})" onmouseleave="hideHoverPreview()">
+        <div class="sm-header"><span class="sm-id">${esc(s['场景编号']||'')}</span><span class="sm-name">${esc(sceneTitle)}</span></div>
+        <div class="sm-fields">
+          <div class="sm-field"><span class="sm-flabel">指导角色:</span><span class="sm-fval${guide?'':' empty'}">${guide?esc(guide):'---'}</span></div>
+          <div class="sm-field"><span class="sm-flabel">作战角色:</span><span class="sm-fval${combat?'':' empty'}">${combat?esc(combat):'---'}</span></div>
+          <div class="sm-field"><span class="sm-flabel">商机来源:</span><span class="sm-fval${source?'':' empty'}">${source?esc(source):'---'}</span></div>
+          <div class="sm-field"><span class="sm-flabel">管控周期:</span><span class="sm-fval${cycle?'':' empty'}">${cycle?esc(cycle):'---'}</span></div>
+        </div>
+      </div>`;
     });
     h+=`</div></div>`;
   }
 
-  if(!h)h='<div class="empty-state">暂无数据</div>';
+  if(!data.scenes||!data.scenes.length){
+    h+='<div class="empty-state">该路径暂无场景数据</div>';
+  }
   el.innerHTML=h;
+}
+
+/* ====== 场景详情页（10个单元模块） ====== */
+/* 10个单元定义 */
+const UNIT_FIELDS=[
+  ['指导角色（营销统筹/专员）','指导角色（营销统筹/专员）'],
+  ['作战角色','作战角色'],
+  ['商机来源','商机来源'],
+  ['最短管控周期','最短管控周期'],
+  ['最短管控动作（量）','最短管控动作（量）'],
+  ['最短管控目标（积分/金额）','最短管控目标（积分/金额）'],
+  ['政策','政策'],
+  ['激励','激励'],
+  ['标准话术','标准话术'],
+  ['闭环管控','闭环管控'],
+];
+
+function openScene(ck,idx){
+  const data=SCENE_CACHE[ck];
+  if(!data||!data.scenes||!data.scenes[idx])return;
+  showPage('scene');
+  const s=data.scenes[idx];
+  const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名场景';
+  /* 面包屑 */
+  document.getElementById('sceneBreadcrumb').innerHTML=`
+    <span class="crumb" onclick="openBattleZones('${data.battle.id}')">${esc(data.battle.name)}</span>
+    <span class="sep">&#10095;</span>
+    <span class="crumb" onclick="openZoneBattles('${data.zone.id}')">${esc(data.zone.name)}</span>
+    <span class="sep">&#10095;</span>
+    <span class="crumb" onclick="openDetail('${data.battle.id}','${data.zone.id}')">数据详情</span>
+    <span class="sep">&#10095;</span>
+    <span class="crumb" onclick="openPath('${data.battle.id}','${data.zone.id}','${esc(data.path?.path_id||'')}')">${esc(data.path?.path_name||'')}</span>
+    <span class="sep">&#10095;</span>
+    <span class="crumb active">${esc(sceneTitle)}</span>`;
+  document.getElementById('sceneInfo').textContent='共'+UNIT_FIELDS.length+'个单元';
+  renderSceneDetail(data,s,sceneTitle);
+}
+
+/* 渲染场景详情页：顶部信息卡 + 10个可点击单元模块 */
+function renderSceneDetail(data,s,sceneTitle){
+  const el=document.getElementById('sceneBody');let h='';
+  const ck=data.battle.id+'|'+data.zone.id+'|'+(data.path?.path_id||'');
+  const sceneIdx=(data.scenes||[]).indexOf(s);
+
+  /* 顶部信息卡：战役 / 战区 / 路径 / 场景 */
+  h+=`<div class="module-section"><div class="module-title">场景信息</div><div class="info-card"><div class="card-fields">`;
+  [['战役',()=>data.battle?.name||'---'],['战区',()=>data.zone?.name||'---'],['路径',()=>data.path?.path_name||'---'],['场景编号',()=>s['场景编号']||'---'],['场景名称',()=>sceneTitle]].forEach(([label,fn])=>{
+    const v=(fn()||'').trim();
+    h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
+  });
+  h+=`</div></div></div>`;
+
+  /* 10个单元模块 */
+  h+=`<div class="module-section"><div class="module-title">单元信息</div><div class="unit-grid">`;
+  UNIT_FIELDS.forEach((u,i)=>{
+    const v=(s[u[1]]||'').trim();
+    const firstV=firstLine(v);
+    h+=`<div class="unit-module" onclick="openUnit('${ck}',${sceneIdx},${i})" onmouseenter="hoverUnitInfo(event,'${ck}',${sceneIdx},${i})" onmouseleave="hideHoverPreview()">
+      <div class="um-label">${esc(u[0])}</div>
+      <div class="um-value${firstV?'':' empty'}">${firstV?esc(firstV):'---'}</div>
+      <span class="um-arrow">&#10095;</span>
+    </div>`;
+  });
+  h+=`</div></div>`;
+  el.innerHTML=h;
+}
+
+/* ====== 单元信息展示页 ====== */
+function openUnit(ck,sceneIdx,unitIdx){
+  const data=SCENE_CACHE[ck];
+  if(!data||!data.scenes||!data.scenes[sceneIdx])return;
+  const s=data.scenes[sceneIdx];
+  const fieldDef=UNIT_FIELDS[unitIdx];
+  if(!fieldDef)return;
+  const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名场景';
+  const v=(s[fieldDef[1]]||'').trim();
+  showPage('unit');
+  document.getElementById('unitBreadcrumb').innerHTML=`
+    <span class="crumb" onclick="openBattleZones('${data.battle.id}')">${esc(data.battle.name)}</span>
+    <span class="sep">&#10095;</span>
+    <span class="crumb" onclick="openZoneBattles('${data.zone.id}')">${esc(data.zone.name)}</span>
+    <span class="sep">&#10095;</span>
+    <span class="crumb" onclick="openDetail('${data.battle.id}','${data.zone.id}')">数据详情</span>
+    <span class="sep">&#10095;</span>
+    <span class="crumb" onclick="openPath('${data.battle.id}','${data.zone.id}','${esc(data.path?.path_id||'')}')">${esc(data.path?.path_name||'')}</span>
+    <span class="sep">&#10095;</span>
+    <span class="crumb" onclick="openScene('${ck}',${sceneIdx})">${esc(sceneTitle)}</span>
+    <span class="sep">&#10095;</span>
+    <span class="crumb active">${esc(fieldDef[0])}</span>`;
+  document.getElementById('unitInfo').textContent='';
+  renderUnitDetail(data,s,sceneTitle,fieldDef,v);
+}
+
+/* 渲染单元信息展示页 —— 整合为一个整体卡片 */
+function renderUnitDetail(data,s,sceneTitle,fieldDef,v){
+  const el=document.getElementById('unitBody');let h='';
+  /* 整合卡片：顶部场景信息 + 主体单元详情 */
+  h+=`<div class="module-section"><div class="unit-detail-card">`;
+  /* 卡片顶部条 */
+  h+=`<div style="font-size:14px;font-weight:700;color:var(--cyan);letter-spacing:2px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border-hover);text-shadow:0 0 8px var(--cyan-glow)">单元信息</div>`;
+  /* 场景信息：横排紧凑布局 */
+  h+=`<div style="display:flex;flex-wrap:wrap;gap:10px 28px;margin-bottom:18px;padding:14px 18px;background:rgba(0,212,255,.05);border-radius:var(--radius);border-left:3px solid var(--cyan)">`;
+  [['战役',()=>data.battle?.name||'---'],['战区',()=>data.zone?.name||'---'],['路径',()=>data.path?.path_name||'---'],['场景',()=>sceneTitle]].forEach(([label,fn])=>{
+    const lv=(fn()||'').trim();
+    h+=`<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--cyan);font-weight:500;white-space:nowrap">${esc(label)}</span><span style="font-size:13px;color:#fff;font-weight:700">${esc(lv)}</span></div>`;
+  });
+  h+=`</div>`;
+  /* 当前单元类型标题 */
+  h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="width:4px;height:18px;background:linear-gradient(180deg,var(--cyan),var(--blue));border-radius:2px"></span><span style="font-size:18px;font-weight:900;color:#fff;letter-spacing:2px">${esc(fieldDef[0])}</span></div>`;
+  /* 单元内容 */
+  if(v){
+    const lines=v.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length===1){
+      h+=`<div style="font-size:15px;color:#fff;line-height:1.8;padding:8px 0">${esc(lines[0])}</div>`;
+    }else{
+      lines.forEach((line,i)=>{
+        h+=`<div style="padding:10px 16px;background:rgba(0,212,255,.04);border:1px solid var(--border);border-radius:4px;font-size:14px;color:#fff;line-height:1.7;margin-bottom:8px"><span style="color:var(--cyan);font-weight:700;margin-right:8px">${i+1}.</span>${esc(line)}</div>`;
+      });
+    }
+  }else{
+    h+='<div class="field-value empty" style="font-size:14px;padding:14px 0;text-align:center">暂无数据</div>';
+  }
+  h+=`</div></div>`;
+  el.innerHTML=h;
+}
+
+/* ====== 悬停预览组件 ====== */
+function firstLine(s){return (s||'').trim().split('\n').filter(l=>l.trim())[0]?.trim()||'';}
+
+function showHoverTip(e,innerHtml){
+  let tip=document.getElementById('hoverTip');
+  if(!tip){tip=document.createElement('div');tip.id='hoverTip';tip.className='hover-tip';document.body.appendChild(tip);}
+  tip.innerHTML=innerHtml;tip.classList.add('show');
+  const rect=e.currentTarget.getBoundingClientRect();
+  const tw=tip.offsetWidth,th=tip.offsetHeight;
+  let left=rect.left;
+  if(left+tw>window.innerWidth-10)left=Math.max(10,window.innerWidth-tw-10);
+  let top=rect.bottom+8;
+  if(top+th>window.innerHeight-10)top=Math.max(10,rect.top-th-8);
+  tip.style.left=left+'px';tip.style.top=top+'px';
+}
+function hideHoverPreview(){const tip=document.getElementById('hoverTip');if(tip)tip.classList.remove('show');}
+
+/* 路径卡片悬停：异步加载并预览该路径的所有场景 */
+async function hoverPathScenes(e,ck,pname){
+  showHoverTip(e,'<div class="ht-title">「'+esc(pname)+'」场景预览</div><div style="color:var(--text-dim)">加载中...</div>');
+  let data=SCENE_CACHE[ck];
+  if(!data){
+    const[bid,zid,pid]=ck.split('|');
+    try{
+      const res=await fetch('/api/path-detail/'+bid+'/'+zid+'/'+encodeURIComponent(pid)+'?token='+TOKEN);
+      if(!res.ok)throw new Error();
+      data=await res.json();SCENE_CACHE[ck]=data;
+    }catch(err){return;}
+  }
+  /* 如果浮层已被隐藏（用户快速移开），不更新 */
+  const tip=document.getElementById('hoverTip');
+  if(!tip||!tip.classList.contains('show'))return;
+  const scenes=data.scenes||[];
+  if(!scenes.length){tip.innerHTML='<div class="ht-title">「'+esc(pname)+'」</div><div class="ht-empty">暂无场景数据</div>';return;}
+  let rows=scenes.map(s=>{
+    const st=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名';
+    return `<div class="ht-item"><div class="ht-item-name">${esc(s['场景编号']||'')} ${esc(st)}</div>`+
+      `<div class="ht-row"><span class="ht-label">指导角色</span><span class="${s['指导角色（营销统筹/专员）']?'ht-val':'ht-empty'}">${s['指导角色（营销统筹/专员）']?esc(s['指导角色（营销统筹/专员）']):'---'}</span></div>`+
+      `<div class="ht-row"><span class="ht-label">作战角色</span><span class="${s['作战角色']?'ht-val':'ht-empty'}">${s['作战角色']?esc(s['作战角色']):'---'}</span></div>`+
+      `<div class="ht-row"><span class="ht-label">商机来源</span><span class="${s['商机来源']?'ht-val':'ht-empty'}">${s['商机来源']?esc(s['商机来源']):'---'}</span></div>`+
+      `</div>`;
+  }).join('');
+  tip.innerHTML='<div class="ht-title">「'+esc(pname)+'」共 '+scenes.length+' 个场景</div>'+rows;
+}
+
+/* 场景模块悬停：预览该场景的全部字段 */
+function hoverSceneInfo(e,ck,idx){
+  const data=SCENE_CACHE[ck];if(!data||!data.scenes||!data.scenes[idx])return;
+  const s=data.scenes[idx];
+  const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名';
+  let rows=UNIT_FIELDS.map(u=>{
+    const v=(s[u[1]]||'').trim();
+    return `<div class="ht-row"><span class="ht-label">${esc(u[0])}</span><span class="${v?'ht-val':'ht-empty'}">${v?esc(firstLine(v)):'---'}</span></div>`;
+  }).join('');
+  showHoverTip(e,'<div class="ht-title">'+esc(s['场景编号']||'')+' '+esc(sceneTitle)+'</div>'+rows);
+}
+
+/* 单元模块悬停：预览该单元的完整信息 */
+function hoverUnitInfo(e,ck,sceneIdx,unitIdx){
+  const data=SCENE_CACHE[ck];if(!data||!data.scenes||!data.scenes[sceneIdx])return;
+  const s=data.scenes[sceneIdx];
+  const fd=UNIT_FIELDS[unitIdx];if(!fd)return;
+  const v=(s[fd[1]]||'').trim();
+  const content=v?esc(v).replace(/\n/g,'<br>'):'<span class="ht-empty">暂无数据</span>';
+  showHoverTip(e,'<div class="ht-title">'+esc(fd[0])+'</div><div class="ht-val" style="line-height:1.8">'+content+'</div>');
 }
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
