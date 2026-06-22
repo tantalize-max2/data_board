@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>夏收看板 · 管理后台</title>
+<title>管理后台 · 夏收行动标准化穿透部署</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
 
@@ -31,10 +31,10 @@
   --aurora:#9e8cfc;
   --aurora-glow:rgba(158,140,252,.2);
 
-  --text-primary:#f5f9ff;
-  --text-secondary:#d8eaff;
-  --text-dim:#b8d4f0;
-  --text-accent:#38d0ff;
+  --text-primary:#ffffff;
+  --text-secondary:#ffffff;
+  --text-dim:#e8f4ff;
+  --text-accent:#ffffff;
 
   --border:rgba(120,200,255,.38);
   --border-hover:rgba(140,220,255,.6);
@@ -261,7 +261,7 @@ body>*{position:relative;z-index:1}
 <body>
 
 <div class="admin-header">
-  <h1>ADMIN PANEL</h1>
+  <h1>管理后台</h1>
   <span class="badge-admin">仅总经理</span>
   <div class="spacer"></div>
   <a class="back-btn" href="javascript:void(0)" id="backToBoard" onclick="backToBoard()">&#8592; 返回看板</a>
@@ -269,9 +269,9 @@ body>*{position:relative;z-index:1}
 
 <div class="admin-layout">
   <nav class="admin-nav">
-    <div class="nav-section-title">OVERVIEW</div>
+    <div class="nav-section-title">概览</div>
     <div class="nav-item active" data-tab="overview"><span class="nav-icon">O</span>数据概览</div>
-    <div class="nav-section-title">MANAGEMENT</div>
+    <div class="nav-section-title">管理</div>
     <div class="nav-item" data-tab="users"><span class="nav-icon">U</span>人员管理</div>
     <div class="nav-item" data-tab="access"><span class="nav-icon">A</span>权限分配</div>
     <div class="nav-item" data-tab="content"><span class="nav-icon">E</span>内容编辑</div>
@@ -364,7 +364,7 @@ async function loadOverview(){
     DASHBOARD = await api('/api/admin/dashboard');
     const zu = DASHBOARD.zone_users;
     el.innerHTML=`
-      <div class="panel-title">数据概览 / DASHBOARD</div>
+      <div class="panel-title">数据概览</div>
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">在册人员</div><div class="stat-value">${DASHBOARD.users}</div><div class="stat-sub">个岗位账号</div></div>
         <div class="stat-card"><div class="stat-label">部署记录</div><div class="stat-value">${DASHBOARD.records}</div><div class="stat-sub">条业务数据</div></div>
@@ -390,7 +390,7 @@ let USERS_STATE = {q:'', zone:''};
 async function loadUsers(){
   const el=document.getElementById('tab-users');
   el.innerHTML=`
-    <div class="panel-title">人员管理 / USERS <span class="count" id="usersCount"></span></div>
+    <div class="panel-title">人员管理 <span class="count" id="usersCount"></span></div>
     <div class="toolbar">
       <div class="search-box with-icon"><span class="icon">&#128269;</span><input id="userQ" placeholder="搜索姓名 / 岗位 / 电话 / 账号" value="${esc(USERS_STATE.q)}"></div>
       <select id="userZone" style="width:150px;height:38px;border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;background:var(--bg-input);color:var(--text-primary);font-family:inherit">
@@ -498,7 +498,7 @@ async function loadAccess(){
     const data=await api('/api/admin/access');
     ACCESS_STATE.battles=data.battles; ACCESS_STATE.warzones=data.warzones; ACCESS_STATE.roles=data.roles;
     el.innerHTML=`
-      <div class="panel-title">权限分配 / ACCESS CONTROL</div>
+      <div class="panel-title">权限分配</div>
       <div class="toolbar">
         <div class="search-box"><select id="accessRole" onchange="selectRole(this.value)">
           <option value="">— 选择岗位 —</option>
@@ -585,7 +585,7 @@ async function loadContent(){
     catch(e){ el.innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; return; }
   }
   el.innerHTML=`
-    <div class="panel-title">内容编辑 / RECORDS <span class="count" id="recCount"></span></div>
+    <div class="panel-title">内容编辑 <span class="count" id="recCount"></span></div>
     <div class="toolbar">
       <select id="fltBattle" style="height:38px;border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;background:var(--bg-input);color:var(--text-primary);font-family:inherit;min-width:150px">
         <option value="">全部战役</option>

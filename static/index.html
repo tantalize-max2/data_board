@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>百日攻坚"夏收"行动部署看板</title>
+<title>百日攻坚"夏收"行动标准化穿透部署</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
 
@@ -32,10 +32,10 @@
   --aurora:#9e8cfc;
   --aurora-glow:rgba(158,140,252,.2);
 
-  --text-primary:#f5f9ff;
-  --text-secondary:#d8eaff;
-  --text-dim:#b8d4f0;
-  --text-accent:#38d0ff;
+  --text-primary:#ffffff;
+  --text-secondary:#ffffff;
+  --text-dim:#e8f4ff;
+  --text-accent:#ffffff;
 
   --border:rgba(120,200,255,.38);
   --border-hover:rgba(140,220,255,.6);
@@ -126,8 +126,8 @@ body>*{position:relative;z-index:1}
 
 .login-box .btn{width:100%;height:50px;
   background:linear-gradient(135deg,var(--cyan-dim),var(--blue));
-  color:#fff;border:none;border-radius:var(--radius);font-size:16px;font-weight:700;
-  cursor:pointer;font-family:var(--font-display);letter-spacing:6px;
+  color:#fff;border:none;border-radius:var(--radius);font-size:18px;font-weight:700;
+  cursor:pointer;font-family:inherit;letter-spacing:12px;
   transition:all .3s;position:relative;overflow:hidden;
   text-shadow:0 1px 2px rgba(0,0,0,.4)}
 .login-box .btn::after{content:'';position:absolute;inset:0;
@@ -293,8 +293,8 @@ body>*{position:relative;z-index:1}
 .search-input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-glow);background:rgba(0,212,255,.04)}
 .search-btn{height:46px;padding:0 32px;
   background:linear-gradient(135deg,var(--cyan-dim),var(--blue));color:#fff;
-  border:none;border-radius:var(--radius);font-size:14px;font-weight:700;
-  cursor:pointer;font-family:var(--font-display);letter-spacing:4px;transition:all .25s;
+  border:none;border-radius:var(--radius);font-size:15px;font-weight:700;
+  cursor:pointer;font-family:inherit;letter-spacing:6px;transition:all .25s;
   text-shadow:0 1px 2px rgba(0,0,0,.3)}
 .search-btn:hover{box-shadow:0 0 20px var(--cyan-glow);filter:brightness(1.1);transform:translateY(-1px)}
 
@@ -450,11 +450,11 @@ body>*{position:relative;z-index:1}
   <div class="login-box">
     <span class="login-corner-tl"></span><span class="login-corner-tr"></span>
     <span class="login-corner-bl"></span><span class="login-corner-br"></span>
-    <h1>夏收行动</h1>
-    <div class="sub">HARVEST OPERATION · DEPLOYMENT DASHBOARD</div>
-    <div class="field"><label>选择角色 / SELECT ROLE</label><select id="selRole"></select></div>
-    <div class="field"><label>输入密码 / PASSWORD</label><input type="password" id="txtPwd" placeholder="请输入密码"></div>
-    <button class="btn" onclick="doLogin()">A C C E S S</button>
+    <h1>百日攻坚"夏收"行动标准化穿透部署</h1>
+    <div class="sub"></div>
+    <div class="field"><label>选择角色</label><select id="selRole"></select></div>
+    <div class="field"><label>输入密码</label><input type="password" id="txtPwd" placeholder="请输入密码"></div>
+    <button class="btn" onclick="doLogin()">登 录</button>
     <div class="error" id="loginErr"></div>
   </div>
 </div>
@@ -462,17 +462,17 @@ body>*{position:relative;z-index:1}
 <!-- 主页 -->
 <div class="page page-main" id="pageMain">
   <div class="header-bar"><div class="header-inner">
-    <div class="header-title">百日攻坚"夏收行动部署"</div>
+    <div class="header-title">百日攻坚"夏收"行动标准化穿透部署</div>
     <div class="header-user"><span class="zone-badge" id="mainZoneBadge"></span><span class="role-badge" id="mainRoleBadge"></span><button class="btn-admin" id="btnAdmin" style="display:none" onclick="openAdmin()">管理后台</button><button class="btn-logout" onclick="doLogout()">退出</button></div>
   </div></div>
   <div class="main-body">
     <div class="search-section" id="searchSection" style="display:none">
       <input class="search-input" id="guideSearch" placeholder="检索指导角色 / 作战角色（如：张三）" onkeydown="if(event.key==='Enter')doSearch()">
-      <button class="search-btn" onclick="doSearch()">SEARCH</button>
+      <button class="search-btn" onclick="doSearch()">搜索</button>
     </div>
-    <div class="section-label">六大战役 / BATTLES</div><div class="card-grid-3" id="mainBattleGrid"></div>
-    <div id="zoneSection"><div class="section-label">四大战区 / WARZONES</div><div class="card-grid-4" id="mainZoneGrid"></div></div>
-    <div class="troop-overview"><div class="label" id="troopLabel">兵种 / TROOPS</div><div class="troop-zones-grid" id="mainTroopZones"></div></div>
+    <div class="section-label">六大战役</div><div class="card-grid-3" id="mainBattleGrid"></div>
+    <div id="zoneSection"><div class="section-label">四大战区</div><div class="card-grid-4" id="mainZoneGrid"></div></div>
+    <div class="troop-overview"><div class="label" id="troopLabel">兵种</div><div class="troop-zones-grid" id="mainTroopZones"></div></div>
     <div class="motto-section"><div class="motto-text">以"商机+标准化"为灵魂</div><div class="motto-sub">扎硬寨，打呆仗，走笨路，用凡人，要巧思，需新为</div></div>
   </div>
 </div>
@@ -584,7 +584,7 @@ async function loadMainPage(){
   document.getElementById('btnAdmin').style.display=isAdmin?'inline-block':'none';
   document.getElementById('searchSection').style.display=isAdmin?'flex':'none';
   document.getElementById('zoneSection').style.display=isAdmin?'block':'none';
-  document.getElementById('troopLabel').textContent=isAdmin?'兵种 / TROOPS':'我的战区 · 兵种';
+  document.getElementById('troopLabel').textContent=isAdmin?'兵种':'我的战区 · 兵种';
   try{
     const res=await fetch('/api/overview?token='+TOKEN);
     if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
@@ -643,7 +643,7 @@ async function openBattleZones(bid){
     const data=await res.json();
     document.getElementById('bzTitle').textContent=data.battle.name;
     document.getElementById('bzInfo').textContent='共'+data.total+'条数据';
-    let h='<div class="section-label">请选择战区 / SELECT WARZONE</div><div class="card-grid-4">';
+    let h='<div class="section-label">请选择战区</div><div class="card-grid-4">';
     data.zones.forEach(z=>{
       h+=`<div class="card-item card-center" onclick="openDetail('${bid}','${z.id}')">
         <div class="card-name" style="color:${mapBattleColor(z.color)}">${esc(z.name)}</div>
@@ -667,7 +667,7 @@ async function openZoneBattles(zid){
     const data=await res.json();
     document.getElementById('zbTitle').textContent=data.zone.name;
     document.getElementById('zbInfo').textContent='共'+data.total+'条数据';
-    let h='<div class="section-label">请选择战役 / SELECT BATTLE</div><div class="card-grid-3">';
+    let h='<div class="section-label">请选择战役</div><div class="card-grid-3">';
     data.battles.forEach(b=>{
       h+=`<div class="card-item" onclick="openDetail('${b.id}','${zid}')">
         <div class="card-name" style="color:${mapBattleColor(b.color)}">${esc(b.name)}</div>
@@ -706,7 +706,7 @@ function renderDetailPage(data){
   const el=document.getElementById('detailBody');let h='';
 
   if(data.basic){
-    h+=`<div class="module-section"><div class="module-title">基本信息 / OVERVIEW</div><div class="info-card"><div class="card-fields">`;
+    h+=`<div class="module-section"><div class="module-title">基本信息</div><div class="info-card"><div class="card-fields">`;
     const fields={"战役编号":"战役编号","战役":"战役","战区":"战区","指导角色":"指导角色（营销统筹/专员）","作战角色":"作战角色"};
     for(const[label,key] of Object.entries(fields)){
       const v=(data.basic[key]||'').trim();
@@ -718,7 +718,7 @@ function renderDetailPage(data){
   if(data.targets){
     const t=data.targets;const hasVal=Object.values(t).some(v=>v&&v.trim());
     if(hasVal){
-      h+=`<div class="module-section"><div class="module-title">目标 / TARGETS</div><div class="info-card"><div class="card-fields">`;
+      h+=`<div class="module-section"><div class="module-title">目标</div><div class="info-card"><div class="card-fields">`;
       for(const[label,key] of [['战役总目标','战役总目标'],['战区总目标','战区总目标']]){
         const v=(t[key]||'').trim();
         h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
@@ -728,7 +728,7 @@ function renderDetailPage(data){
   }
 
   if(data.paths&&data.paths.length){
-    h+=`<div class="module-section"><div class="module-title">路径 / PATHS</div><div class="path-grid">`;
+    h+=`<div class="module-section"><div class="module-title">路径</div><div class="path-grid">`;
     data.paths.forEach(p=>{
       h+=`<div class="path-card" onclick="openPath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}')">
         <div class="path-name">${esc(p.path_name)}</div>
@@ -771,7 +771,7 @@ function renderPathPage(data){
   const el=document.getElementById('pathBody');let h='';
 
   if(data.path){
-    h+=`<div class="module-section"><div class="module-title">路径信息 / PATH INFO</div><div class="info-card"><div class="card-fields">`;
+    h+=`<div class="module-section"><div class="module-title">路径信息</div><div class="info-card"><div class="card-fields">`;
     [['路径编号','path_id'],['路径','path_name'],['路径目标','path_target']].forEach(([label,key])=>{
       const v=(data.path[key]||'').trim();
       h+=`<div class="field-row"><div class="field-label">${esc(label)}</div><div class="field-value${v?'':' empty'}">${v?esc(v):'---'}</div></div>`;
@@ -780,7 +780,7 @@ function renderPathPage(data){
   }
 
   if(data.scenes&&data.scenes.length){
-    h+=`<div class="module-section"><div class="module-title">场景 / SCENES</div><div class="scene-grid">`;
+    h+=`<div class="module-section"><div class="module-title">场景</div><div class="scene-grid">`;
     data.scenes.forEach(s=>{
       const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名场景';
       h+=`<div class="scene-card"><div class="scene-header"><span class="scene-id">${esc(s['场景编号'])}</span><span class="scene-name">${esc(sceneTitle)}</span></div><div class="scene-fields">`;
