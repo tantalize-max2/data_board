@@ -88,7 +88,7 @@ SUBSTANTIVE_COLS = ["warzone_name", "warzone_target", "path_no", "path_name", "p
                     "scene_no", "scene_name", "guide_role", "combat_role",
                     "opportunity_source", "control_cycle", "control_action",
                     "control_target", "policy", "incentive", "standard_talk",
-                    "closed_loop_control"]
+                    "closed_loop_control", "process_flow"]
 
 
 def has_substantive(r: dict) -> bool:
@@ -204,6 +204,7 @@ def get_scenes(rows: List[dict], path_no: str) -> List[dict]:
             "激励": r.get("incentive", ""),
             "标准话术": r.get("standard_talk", ""),
             "闭环管控": r.get("closed_loop_control", ""),
+            "受理到交付的流程": r.get("process_flow", ""),
         })
     return scenes
 
@@ -351,52 +352,47 @@ async def search(request: Request, keyword: str = ""):
     return {"keyword": kw, "results": matched, "total": len(matched)}
 
 
-@app.get("/api/role-battles/{role_id}")
-async def role_battles(role_id: str, request: Request):
-    """查看某角色的战役信息（兵种标签点击）
-    权限：总经理可查任何；分局长/客户经理可查本战区角色；其余只能查自己。
+@app.get("/api/role-battles/{role_name}")
+async def role_battles(role_name: str, request: Request):
+    """查看某角色（作战角色/指导角色）的战役信息（兵种标签点击）
+    权限：基于当前用户可见数据范围（get_role_rows），指导角色和作战角色权限逻辑一致。
     """
     s = require_session(request)
-    target = db.query_one("SELECT zone,role_name FROM users WHERE role_id=%s AND is_active=1", (role_id,))
-    if not target:
-        raise HTTPException(404, "角色不存在")
-    if not s.get("is_admin") and s["role_id"] != role_id:
-        me = db.query_one("SELECT zone,role_name FROM users WHERE username=%s AND is_active=1", (s["username"],))
-        if not me or me["zone"] != target["zone"]:
-            raise HTTPException(403, "无权查看其它战区角色")
-        if "分局长" not in (me["role_name"] or "") and "客户经理" not in (me["role_name"] or ""):
-            raise HTTPException(403, "仅分局长/客户经理可查看本战区其它兵种")
+    role_name = (role_name or "").strip()
+    if not role_name:
+        raise HTTPException(400, "角色名不能为空")
+    rows = get_role_rows(s)
+    bl, wl = battle_lookup(), warzone_lookup()
+    # 在可见数据中匹配 combat_role 或 guide_role（指导/作战角色统一逻辑）
+    matched = [r for r in rows
+               if str(r.get("combat_role", "") or "").strip() == role_name
+               or str(r.get("guide_role", "") or "").strip() == role_name]
+    if not matched:
+        return {"role_name": role_name, "battles": [], "total": 0}
 
-    bl = battle_lookup()
-    wl = warzone_lookup()
-    pairs = db.query_all("SELECT DISTINCT battle_id,warzone_id FROM role_access WHERE role_id=%s", (role_id,))
-    if not pairs:
-        return {"role_id": role_id, "role_name": target["role_name"], "zone": target["zone"],
-                "battles": [], "total": 0}
+    # 按战役+战区聚合
+    battle_map: Dict[str, Dict[str, int]] = {}
+    for r in matched:
+        bid, zid = r.get("battle_id"), r.get("warzone_id")
+        if bid and zid:
+            battle_map.setdefault(bid, {})
+            battle_map[bid][zid] = battle_map[bid].get(zid, 0) + 1
 
     battles = []
-    for bid in sorted(set(p["battle_id"] for p in pairs)):
+    for bid in sorted(battle_map.keys()):
         b = bl.get(bid)
         if not b:
             continue
-        zids = [p["warzone_id"] for p in pairs if p["battle_id"] == bid]
-        ph = ",".join(["%s"] * len(zids))
-        rows = db.query_all(
-            f"SELECT * FROM deployment_records WHERE battle_id=%s AND warzone_id IN ({ph})",
-            [bid] + zids)
-        rows = [r for r in rows if has_substantive(r)]
-        if not rows:
-            continue
         zones = []
-        for zid in sorted(set(r["warzone_id"] for r in rows)):
+        total = 0
+        for zid, zcnt in battle_map[bid].items():
             w = wl.get(zid)
             if w:
-                zcnt = len([r for r in rows if r["warzone_id"] == zid])
                 zones.append({"id": w["id"], "name": w["name"], "color": w["color"], "count": zcnt})
+                total += zcnt
         battles.append({"id": b["id"], "name": b["name"], "color": b["color"],
-                        "count": len(rows), "zones": zones})
-    return {"role_id": role_id, "role_name": target["role_name"], "zone": target["zone"],
-            "battles": battles, "total": sum(b["count"] for b in battles)}
+                        "count": total, "zones": zones})
+    return {"role_name": role_name, "battles": battles, "total": len(matched)}
 
 
 @app.get("/api/battle-zones/{battle_id}")
@@ -447,6 +443,7 @@ async def zone_battles(zone_id: str, request: Request):
         b = bl.get(bid)
         if b:
             battle_list.append({"id": b["id"], "name": b["name"], "color": b["color"], "count": cnt})
+    # 兵种角色：从 users 表获取
     roles = [u["role_name"] for u in db.query_all(
         "SELECT DISTINCT role_name FROM users WHERE zone=%s AND is_active=1 AND is_admin=0", (zone_id,))]
     return {"role": get_user_info(s["username"]),
@@ -523,6 +520,7 @@ RECORD_FIELDS = [
     ("incentive", "激励", "textarea"),
     ("standard_talk", "标准话术", "textarea"),
     ("closed_loop_control", "闭环管控（注：要写清楚融入到531、642、321中去）", "textarea"),
+    ("process_flow", "受理到交付的流程", "textarea"),
 ]
 RECORD_DB_COLS = [f[0] for f in RECORD_FIELDS]
 

@@ -702,7 +702,7 @@ function renderTroopOverview(zones){
   const canClick=isAdmin||isZoneManager;
   let h='';zones.forEach(z=>{
     let tags='';(z.roles||[]).forEach(r=>{
-      const isMe=r===ROLE.id;
+      const isMe=r===ROLE.role_name;
       const cls='tz-tag'+(isMe?' is-me':'')+(canClick?' clickable':'');
       const click=canClick?` onclick="showRoleBattles('${esc(r)}')"`:'';
       const title=canClick?('点击查看'+esc(r)+'的战役信息'):'';
@@ -892,7 +892,7 @@ function renderPathPage(data){
 }
 
 /* ====== 场景详情页（10个单元模块） ====== */
-/* 10个单元定义 */
+/* 11个单元定义 */
 const UNIT_FIELDS=[
   ['指导角色（营销统筹/专员）','指导角色（营销统筹/专员）'],
   ['作战角色','作战角色'],
@@ -904,6 +904,7 @@ const UNIT_FIELDS=[
   ['激励','激励'],
   ['标准话术','标准话术'],
   ['闭环管控','闭环管控'],
+  ['受理到交付的流程','受理到交付的流程'],
 ];
 
 function openScene(ck,idx){
@@ -1101,9 +1102,9 @@ function openModal(title, bodyHTML, small){
 }
 function closeModal(){const m=document.getElementById('modalMask');if(m)m.classList.remove('show');}
 
-/* ====== 兵种标签点击查看战役信息 ====== */
+/* ====== 兵种标签点击查看战役信息（作战角色/指导角色权限逻辑一致） ====== */
 async function showRoleBattles(roleName){
-  openModal(roleName+' · 战役信息','<div class="empty-state" style="padding:30px">加载中...</div>');
+  openModal('「'+roleName+'」 · 战役信息','<div class="empty-state" style="padding:30px">加载中...</div>');
   try{
     const res=await fetch('/api/role-battles/'+encodeURIComponent(roleName)+'?token='+TOKEN);
     if(!res.ok){
@@ -1116,7 +1117,7 @@ async function showRoleBattles(roleName){
       document.getElementById('modalBody').innerHTML='<div class="empty-state">「'+esc(roleName)+'」暂无战役数据</div>';
       return;
     }
-    let h='<div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;letter-spacing:1px">'+esc(roleName)+' 共参与 '+data.battles.length+' 个战役，'+data.total+' 条数据</div>';
+    let h='<div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;letter-spacing:1px">「'+esc(roleName)+'」共参与 '+data.battles.length+' 个战役，'+data.total+' 条数据</div>';
     h+='<div class="card-grid-3" style="gap:12px">';
     data.battles.forEach(b=>{
       const zoneStr=(b.zones||[]).map(z=>z.name).join('、');
