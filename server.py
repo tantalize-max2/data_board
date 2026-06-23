@@ -900,20 +900,23 @@ def _safe_info_path(subpath: str = "") -> str:
 def info_list(request: Request, folder: str = ""):
     """列出目录内容（子目录 + 文件），所有角色可访问"""
     require_session(request)
-    dp = _safe_info_path(folder)
+    dp = _safe_info_path(folder) if folder else INFO_DIR
     if not os.path.isdir(dp):
         raise HTTPException(404, "目录不存在")
     dirs, files = [], []
-    for name in sorted(os.listdir(dp)):
+    all_items = os.listdir(dp)
+    # 子目录按排序前缀排序，文件按名称排序
+    dir_names = sorted([n for n in all_items if os.path.isdir(os.path.join(dp, n))])
+    file_names = sorted([n for n in all_items if os.path.isfile(os.path.join(dp, n))])
+    for name in dir_names:
+        dirs.append({"name": _strip_order_prefix(name), "raw_name": name, "type": "dir"})
+    for name in file_names:
         fp = os.path.join(dp, name)
-        if os.path.isdir(fp):
-            dirs.append({"name": name, "type": "dir"})
-        elif os.path.isfile(fp):
-            ext = os.path.splitext(name)[1].lower()
-            files.append({
-                "name": name, "size": os.path.getsize(fp), "ext": ext,
-                "preview": ext in _PREVIEW_EXTS,
-            })
+        ext = os.path.splitext(name)[1].lower()
+        files.append({
+            "name": name, "size": os.path.getsize(fp), "ext": ext,
+            "preview": ext in _PREVIEW_EXTS,
+        })
     return {"path": folder.strip('/'), "dirs": dirs, "files": files}
 
 
@@ -990,6 +993,42 @@ def admin_rmdir(folder: str, request: Request):
     if dp == os.path.normpath(INFO_DIR):
         raise HTTPException(400, "不能删除根目录")
     shutil.rmtree(dp)
+    return {"ok": True}
+
+
+def _strip_order_prefix(name: str) -> str:
+    """去掉文件夹名前面的排序前缀 'NN_' 或 'NN.'"""
+    import re
+    return re.sub(r'^\d{2}[._]\s*', '', name)
+
+
+@app.put("/api/admin/info/reorder")
+async def admin_reorder(request: Request):
+    """重新排序同级目录。body: {"parent": "父路径", "items": ["文件夹A","文件夹B",...]}"""
+    require_admin(request)
+    body = await request.json()
+    parent = (body.get("parent") or "").strip('/')
+    items = body.get("items") or []
+    if not items:
+        raise HTTPException(400, "排序列表为空")
+    base = _safe_info_path(parent) if parent else INFO_DIR
+    if not os.path.isdir(base):
+        raise HTTPException(404, "目录不存在")
+    # 先全部重命名为临时名，避免改名时名称冲突
+    temp_names = {}
+    for idx, item in enumerate(items):
+        item = os.path.basename(item)
+        old_path = os.path.join(base, item)
+        if not os.path.isdir(old_path):
+            continue
+        tmp_path = os.path.join(base, f"__tmp_reorder_{idx}")
+        os.rename(old_path, tmp_path)
+        temp_names[tmp_path] = item
+    # 再按新顺序加上前缀
+    for idx, (tmp_path, item) in enumerate(sorted(temp_names.keys(), key=lambda k: int(k.split('_')[-1]))):
+        prefix = f"{idx:02d}_"
+        new_path = os.path.join(base, prefix + temp_names[tmp_path])
+        os.rename(tmp_path, new_path)
     return {"ok": True}
 
 

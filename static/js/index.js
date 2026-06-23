@@ -715,12 +715,14 @@ function renderInfoBrowser(data,isAdmin){
   }
   /* 子文件夹列表 */
   if(data.dirs&&data.dirs.length){
-    h+='<div class="info-folder-list">';
+    const dragAttr=isAdmin?' draggable="true" ondragstart="folderDragStart(event)" ondragover="folderDragOver(event)" ondrop="folderDrop(event)" ondragend="folderDragEnd(event)"':'';
+    h+='<div class="info-folder-list" id="folderList">';
     data.dirs.forEach(d=>{
       const subPath=INFO_NAV_PATH?INFO_NAV_PATH+'/'+d.name:d.name;
-      h+=`<div class="info-folder-item" onclick="infoFolderItemClick('${esc(subPath)}',event)">`;
+      h+=`<div class="info-folder-item" data-raw="${esc(d.raw_name||d.name)}" data-name="${esc(d.name)}" onclick="infoFolderItemClick('${esc(subPath)}',event)"${dragAttr}>`;
       const nameExtra=isAdmin?` ondblclick="event.stopPropagation();inlineRename(this)" title="双击重命名"`:'';
-      h+=`<span class="info-folder-icon">
+      const dragHandle=isAdmin?'<span class="info-folder-drag">&#8942;&#8942;</span>':'';
+      h+=`${dragHandle}<span class="info-folder-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/>
           </svg>
@@ -836,7 +838,47 @@ async function createDir(path){
   }catch(e){showToast('网络错误','error');}
 }
 
-/* 删除文件夹 */
+/* 拖拽排序文件夹 */
+let _dragSrcEl=null;
+function folderDragStart(e){
+  _dragSrcEl=e.currentTarget;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/html',e.currentTarget.innerHTML);
+}
+function folderDragOver(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  const target=e.currentTarget;
+  if(target===_dragSrcEl)return;
+  const list=target.parentNode;
+  const rect=target.getBoundingClientRect();
+  const midpoint=rect.top+rect.height/2;
+  if(e.clientY<midpoint){list.insertBefore(_dragSrcEl,target);}
+  else{list.insertBefore(_dragSrcEl,target.nextSibling);}
+}
+async function folderDrop(e){
+  e.preventDefault();
+  e.stopPropagation();
+  if(!_dragSrcEl)return;
+  const list=document.getElementById('folderList');
+  if(!list)return;
+  const items=Array.from(list.querySelectorAll('.info-folder-item')).map(el=>el.dataset.name);
+  folderDragEnd(e);
+  if(!items.length)return;
+  try{
+    const res=await fetch('/api/admin/info/reorder?token='+encodeURIComponent(TOKEN),
+      {method:'PUT',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({parent:INFO_NAV_PATH,items:items})});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'排序失败','error');return;}
+    showToast('排序已保存','success');
+    await loadInfoSections();
+  }catch(e){showToast('网络错误','error');}
+}
+function folderDragEnd(e){
+  if(_dragSrcEl)_dragSrcEl.classList.remove('dragging');
+  _dragSrcEl=null;
+}
 function promptDeleteDir(path){
   showConfirm('确定删除文件夹「'+path.split('/').pop()+'」及其所有内容？',()=>deleteDir(path));
 }
@@ -851,18 +893,59 @@ async function deleteDir(path){
   }catch(e){showToast('网络错误','error');}
 }
 
-/* 上传文件 */
+/* 上传文件（带进度条） */
 async function uploadFiles(files){
   if(!files||!files.length)return;
-  for(const file of files){
+  const fileList=Array.from(files);
+  for(let i=0;i<fileList.length;i++){
+    const file=fileList[i];
+    showUploadProgress(file.name,i+1,fileList.length,0);
     try{
-      const fd=new FormData();fd.append('file',file);
-      const res=await fetch('/api/admin/info/upload/'+_encodePath(INFO_NAV_PATH)+'?token='+encodeURIComponent(TOKEN),{method:'POST',body:fd});
-      if(!res.ok){const d=await res.json();showToast('上传失败: '+file.name+' - '+(d.detail||''),'error');return;}
-    }catch(e){showToast('上传失败: '+file.name,'error');return;}
+      await uploadOneFile(file,(pct)=>showUploadProgress(file.name,i+1,fileList.length,pct));
+    }catch(e){
+      showToast('上传失败: '+file.name+(e.message?' - '+e.message:''),'error');
+      clearUploadProgress();
+      return;
+    }
   }
+  clearUploadProgress();
   showToast('上传完成','success');
   loadInfoBrowser();
+}
+
+function uploadOneFile(file,onProgress){
+  return new Promise((resolve,reject)=>{
+    const fd=new FormData();fd.append('file',file);
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST','/api/admin/info/upload/'+_encodePath(INFO_NAV_PATH)+'?token='+encodeURIComponent(TOKEN));
+    xhr.upload.onprogress=function(e){
+      if(e.lengthComputable&&onProgress){onProgress(Math.round(e.loaded/e.total*100));}
+    };
+    xhr.onload=function(){
+      if(xhr.status>=200&&xhr.status<300){resolve();}
+      else{try{const d=JSON.parse(xhr.responseText);reject(new Error(d.detail||''));}catch(_){reject(new Error(''));}}
+    };
+    xhr.onerror=function(){reject(new Error('网络错误'));};
+    xhr.send(fd);
+  });
+}
+
+function showUploadProgress(fileName,curIdx,total,pct){
+  const body=document.getElementById('infoModalBody');
+  let bar=document.getElementById('uploadProgress');
+  if(!bar){
+    bar=document.createElement('div');bar.id='uploadProgress';bar.className='upload-progress';
+    body.insertBefore(bar,body.firstChild);
+  }
+  bar.innerHTML='<div class="upload-progress-info">'+
+    '<span class="upload-progress-name">'+esc(fileName)+'</span>'+
+    '<span class="upload-progress-count">('+curIdx+'/'+total+')</span>'+
+    '<span class="upload-progress-pct">'+pct+'%</span></div>'+
+    '<div class="upload-progress-bar"><div class="upload-progress-fill" style="width:'+pct+'%"></div></div>';
+}
+function clearUploadProgress(){
+  const bar=document.getElementById('uploadProgress');
+  if(bar)bar.remove();
 }
 
 /* 删除文件 */
