@@ -143,6 +143,7 @@ async function fetchUsers(){
               <td>
                 <button class="btn btn-ghost btn-sm" onclick="openUserEdit(${u.id})">编辑</button>
                 ${u.is_active?`<button class="btn btn-danger btn-sm" onclick="stopUser(${u.id},'${esc(u.name)}')">停用</button>`:''}
+                <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${esc(u.name)}')">删除</button>
               </td>
             </tr>`).join('')}
           </tbody>
@@ -196,6 +197,12 @@ async function saveUser(uid){
 async function stopUser(uid,name){
   if(!confirm('确认停用「'+name+'」？停用后该账号无法登录。'))return;
   try{ await api('/api/admin/users/'+uid,{method:'DELETE'}); toast('已停用','success'); fetchUsers(); }
+  catch(e){toast(e.message,'error');}
+}
+
+async function deleteUser(uid,name){
+  if(!confirm('确认删除「'+name+'」？\n\n⚠️ 此操作不可恢复，将永久删除该人员所有数据！'))return;
+  try{ await api('/api/admin/users/'+uid+'?hard=1',{method:'DELETE'}); toast('已删除','success'); fetchUsers(); }
   catch(e){toast(e.message,'error');}
 }
 

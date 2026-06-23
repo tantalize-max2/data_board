@@ -717,12 +717,16 @@ async def admin_update_user(uid: int, request: Request):
 
 
 @app.delete("/api/admin/users/{uid}")
-async def admin_delete_user(uid: int, request: Request):
-    """停用人员（软删除，保留数据可追溯）"""
+async def admin_delete_user(uid: int, request: Request, hard: int = 0):
+    """停用人员（软删除，is_active=0）；hard=1 时物理删除"""
     s = require_admin(request)
-    if str(uid) == str(db.query_one("SELECT id FROM users WHERE username=%s", (s["username"],))["id"]):
-        raise HTTPException(400, "不能停用自己")
-    db.execute("UPDATE users SET is_active=0 WHERE id=%s", (uid,))
+    me = db.query_one("SELECT id FROM users WHERE username=%s", (s["username"],))
+    if str(uid) == str(me["id"]):
+        raise HTTPException(400, "不能删除/停用自己")
+    if hard:
+        db.execute("DELETE FROM users WHERE id=%s", (uid,))
+    else:
+        db.execute("UPDATE users SET is_active=0 WHERE id=%s", (uid,))
     return {"ok": True}
 
 
