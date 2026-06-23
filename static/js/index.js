@@ -14,18 +14,24 @@ let TOKEN='',ROLE=null;
       groups[g].forEach(r=>{const o=document.createElement('option');o.value=r.id;o.text='  '+r.name;sel.appendChild(o);});
     });
   }catch(e){sel.innerHTML='<option>角色加载失败</option>'}
-  /* 检测 URL token 参数（从管理后台返回时），自动恢复会话进入主页 */
+  /* 检测 token：URL 参数（管理后台返回） > localStorage（持久登录） */
   const urlToken=new URLSearchParams(location.search).get('token');
-  if(urlToken){
+  const savedToken=urlToken||localStorage.getItem('xs_token');
+  if(savedToken){
     try{
-      const meRes=await fetch('/api/me?token='+encodeURIComponent(urlToken));
+      const meRes=await fetch('/api/me?token='+encodeURIComponent(savedToken));
       if(meRes.ok){
         const meData=await meRes.json();
-        TOKEN=urlToken;ROLE=meData;
-        history.replaceState(null,'','/');
+        TOKEN=savedToken;ROLE=meData;
+        localStorage.setItem('xs_token',TOKEN);
+        if(urlToken) history.replaceState(null,'','/');
         showPage('main');loadMainPage();
+      }else{
+        /* token 失效，清除并回到登录页 */
+        localStorage.removeItem('xs_token');
+        showPage('login');
       }
-    }catch(e){}
+    }catch(e){ showPage('login'); }
   }else{
     showPage('login');
   }
@@ -61,13 +67,13 @@ async function doLogin(){
   try{
     const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role_id:rid,password:pwd})});
     if(!res.ok){const d=await res.json();showErr(d.detail||'登录失败');return;}
-    const data=await res.json();TOKEN=data.token;ROLE=data.role;PAGE_HISTORY=['main'];showPage('main');loadMainPage();
+    const data=await res.json();TOKEN=data.token;ROLE=data.role;PAGE_HISTORY=['main'];localStorage.setItem('xs_token',TOKEN);showPage('main');loadMainPage();
   }catch(e){showErr('网络错误');}
 }
 function showErr(m){document.getElementById('loginErr').textContent=m;}
 async function doLogout(){
   try{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN})});}catch(e){}
-  TOKEN='';ROLE=null;PAGE_HISTORY=[];document.getElementById('txtPwd').value='';document.getElementById('loginErr').textContent='';showPage('login');
+  TOKEN='';ROLE=null;PAGE_HISTORY=[];localStorage.removeItem('xs_token');document.getElementById('txtPwd').value='';document.getElementById('loginErr').textContent='';showPage('login');
 }
 
 /* ====== 主页 ====== */
