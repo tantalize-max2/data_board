@@ -41,6 +41,8 @@
     <div class="section-label">六大战役</div><div class="card-grid-3" id="mainBattleGrid"></div>
     <div id="zoneSection"><div class="section-label">四大战区</div><div class="card-grid-4" id="mainZoneGrid"></div></div>
     <div class="troop-overview"><div class="label" id="troopLabel">兵种</div><div class="troop-zones-grid" id="mainTroopZones"></div></div>
+    <!-- 资料中心 -->
+    <div class="section-label">资料中心</div><div class="card-grid-3" id="mainInfoGrid"></div>
     <div class="motto-section"><div class="motto-text">以"商机+标准化"为灵魂</div><div class="motto-sub">扎硬寨，打呆仗，走笨路，用凡人，要巧思，需新为</div></div>
   </div>
 </div>
@@ -104,6 +106,47 @@
   </div>
   <div class="sub-body" id="unitBody"></div>
 </div>
+
+<!-- 资料中心 - 文件列表弹窗 -->
+<div class="modal-mask" id="infoModal" onclick="if(event.target===this)closeInfoModal()">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <h3 id="infoModalTitle">资料中心</h3>
+      <button class="modal-close" onclick="closeInfoModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="infoModalBody"></div>
+  </div>
+</div>
+
+<!-- 自定义确认弹窗 -->
+<div class="modal-mask" id="confirmMask" onclick="if(event.target===this)closeConfirm()">
+  <div class="modal-box modal-sm">
+    <div class="modal-header"><h3 id="confirmTitle">确认</h3></div>
+    <div class="modal-body"><p class="confirm-msg" id="confirmMsg"></p></div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-no" id="confirmNo" onclick="closeConfirm()">取消</button>
+      <button class="modal-btn modal-btn-ok" id="confirmOk" onclick="execConfirm()">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 自定义输入弹窗 -->
+<div class="modal-mask" id="promptMask" onclick="if(event.target===this)closePrompt()">
+  <div class="modal-box modal-sm">
+    <div class="modal-header"><h3 id="promptTitle">请输入</h3></div>
+    <div class="modal-body">
+      <p class="prompt-msg" id="promptMsg"></p>
+      <input type="text" class="prompt-input" id="promptInput" onkeydown="onPromptKey(event)">
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-no" onclick="closePrompt()">取消</button>
+      <button class="modal-btn modal-btn-ok" id="promptOk" onclick="execPrompt()">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast 通知 -->
+<div class="toast-container" id="toastContainer"></div>
 
 <script src="/static/js/index.js"></script>
 </body>

@@ -11,10 +11,10 @@
 API 兼容：原有 6 个业务接口签名不变，前端无需改动调用方式。
 新增：/api/roles, /api/admin/* 一组管理接口。
 """
-import os, hashlib, time, hmac, base64, json, secrets, threading
+import os, hashlib, time, hmac, base64, json, secrets, threading, shutil, urllib.parse
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, Request, HTTPException, Query, UploadFile, File
+from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import db
@@ -873,6 +873,154 @@ def _warzone_id(name: str) -> Optional[str]:
         return None
     r = db.query_one("SELECT id FROM warzones WHERE name=%s", (name,))
     return r["id"] if r else None
+
+
+# ====== 资料中心（info 目录文件管理，支持子目录）======
+INFO_DIR = os.path.join(BASE_DIR, "info")
+
+# 可直接在浏览器预览的扩展名
+_PREVIEW_EXTS = {'.pdf', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.txt', '.md'}
+# 允许上传的扩展名
+_ALLOWED_EXTS = _PREVIEW_EXTS | {'.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+                                  '.zip', '.rar', '.7z', '.csv', '.mp4', '.mp3'}
+
+
+def _safe_info_path(subpath: str = "") -> str:
+    """安全解析 info 子路径，防止路径穿越"""
+    base = os.path.normpath(INFO_DIR)
+    sub = subpath.strip().strip('/').strip('\\')
+    full = os.path.normpath(os.path.join(base, sub)) if sub else base
+    if not full.startswith(base):
+        raise HTTPException(400, "路径非法")
+    return full
+
+
+@app.get("/api/info/list")
+@app.get("/api/info/list/{folder:path}")
+def info_list(request: Request, folder: str = ""):
+    """列出目录内容（子目录 + 文件），所有角色可访问"""
+    require_session(request)
+    dp = _safe_info_path(folder)
+    if not os.path.isdir(dp):
+        raise HTTPException(404, "目录不存在")
+    dirs, files = [], []
+    for name in sorted(os.listdir(dp)):
+        fp = os.path.join(dp, name)
+        if os.path.isdir(fp):
+            dirs.append({"name": name, "type": "dir"})
+        elif os.path.isfile(fp):
+            ext = os.path.splitext(name)[1].lower()
+            files.append({
+                "name": name, "size": os.path.getsize(fp), "ext": ext,
+                "preview": ext in _PREVIEW_EXTS,
+            })
+    return {"path": folder.strip('/'), "dirs": dirs, "files": files}
+
+
+@app.get("/api/info/file/{filepath:path}")
+def info_file(filepath: str, request: Request):
+    """下载或预览文件，所有角色可访问"""
+    require_session(request)
+    fp = _safe_info_path(filepath)
+    if not os.path.isfile(fp):
+        raise HTTPException(404, "文件不存在")
+    fn = os.path.basename(fp)
+    ext = os.path.splitext(fn)[1].lower()
+    inline = ext in _PREVIEW_EXTS
+    encoded = urllib.parse.quote(fn)
+    return FileResponse(fp, filename=fn,
+        headers={"Content-Disposition": f"{'inline' if inline else 'attachment'}; filename*=UTF-8''{encoded}"})
+
+
+@app.get("/api/info/zip/{filepath:path}")
+def info_zip_list(filepath: str, request: Request):
+    """列出 ZIP 文件内容"""
+    require_session(request)
+    import zipfile as _zip
+    fp = _safe_info_path(filepath)
+    if not os.path.isfile(fp):
+        raise HTTPException(404, "文件不存在")
+    try:
+        with _zip.ZipFile(fp, 'r') as zf:
+            entries = [{"name": i.filename, "size": i.file_size}
+                       for i in zf.infolist() if not i.is_dir()]
+            return {"name": os.path.basename(fp), "entries": entries, "total": len(entries)}
+    except _zip.BadZipFile:
+        raise HTTPException(400, "不是有效的ZIP文件")
+
+
+@app.post("/api/admin/info/dir/{folder:path}")
+def admin_mkdir(folder: str, request: Request):
+    """创建目录（支持多级），仅管理员"""
+    require_admin(request)
+    dp = _safe_info_path(folder)
+    if os.path.exists(dp):
+        raise HTTPException(400, "目录已存在")
+    os.makedirs(dp, exist_ok=True)
+    return {"ok": True}
+
+
+@app.put("/api/admin/info/rename/{folder:path}")
+async def admin_rename(folder: str, request: Request):
+    """重命名目录，仅管理员。body: {"new_name": "新名称"}"""
+    require_admin(request)
+    body = await request.json()
+    new_name = (body.get("new_name") or "").strip()
+    if not new_name or '/' in new_name or '\\' in new_name or '..' in new_name:
+        raise HTTPException(400, "新名称非法")
+    dp = _safe_info_path(folder)
+    if not os.path.isdir(dp):
+        raise HTTPException(404, "目录不存在")
+    if dp == os.path.normpath(INFO_DIR):
+        raise HTTPException(400, "不能重命名根目录")
+    new_path = os.path.join(os.path.dirname(dp), new_name)
+    if os.path.exists(new_path):
+        raise HTTPException(400, "名称已存在")
+    os.rename(dp, new_path)
+    return {"ok": True, "new_path": "/".join(folder.split("/")[:-1] + [new_name])}
+
+
+@app.delete("/api/admin/info/dir/{folder:path}")
+def admin_rmdir(folder: str, request: Request):
+    """删除目录（递归删除内容），仅管理员"""
+    require_admin(request)
+    dp = _safe_info_path(folder)
+    if not os.path.isdir(dp):
+        raise HTTPException(404, "目录不存在")
+    if dp == os.path.normpath(INFO_DIR):
+        raise HTTPException(400, "不能删除根目录")
+    shutil.rmtree(dp)
+    return {"ok": True}
+
+
+@app.post("/api/admin/info/upload/{folder:path}")
+async def admin_upload(folder: str, request: Request, file: UploadFile = File(...)):
+    """上传文件到指定目录，仅管理员"""
+    require_admin(request)
+    dp = _safe_info_path(folder)
+    if not os.path.isdir(dp):
+        raise HTTPException(404, "目录不存在")
+    fn = os.path.basename(file.filename or "unnamed")
+    if '..' in fn or '/' in fn or '\\' in fn:
+        raise HTTPException(400, "文件名非法")
+    ext = os.path.splitext(fn)[1].lower()
+    if ext not in _ALLOWED_EXTS:
+        raise HTTPException(400, f"不支持的文件类型: {ext}")
+    fp = os.path.join(dp, fn)
+    with open(fp, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    return {"ok": True, "name": fn, "size": os.path.getsize(fp)}
+
+
+@app.delete("/api/admin/info/file/{filepath:path}")
+def admin_delete_file(filepath: str, request: Request):
+    """删除文件，仅管理员"""
+    require_admin(request)
+    fp = _safe_info_path(filepath)
+    if not os.path.isfile(fp):
+        raise HTTPException(404, "文件不存在")
+    os.remove(fp)
+    return {"ok": True}
 
 
 if __name__ == "__main__":

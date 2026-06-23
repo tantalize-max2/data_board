@@ -94,6 +94,7 @@ async function loadMainPage(){
     renderBattleGrid(data.battles);
     if(isAdmin) renderZoneGrid(data.zones);
     renderTroopOverview(data.zones);
+    loadInfoSections();
   }catch(e){document.getElementById('mainBattleGrid').innerHTML='<div class="empty-state">加载失败</div>';}
 }
 
@@ -596,4 +597,296 @@ async function doSearch(){
     });
     document.getElementById('drawerBody').innerHTML=h;
   }catch(e){document.getElementById('drawerBody').innerHTML='<div class="empty-state">检索失败</div>';}
+}
+
+
+/* ====== 自定义弹窗（替代 alert/confirm/prompt）====== */
+function showToast(msg,type){
+  const c=document.getElementById('toastContainer');
+  const item=document.createElement('div');
+  item.className='toast-item toast-'+(type||'info');
+  item.textContent=msg;
+  c.appendChild(item);
+  requestAnimationFrame(()=>item.classList.add('show'));
+  setTimeout(()=>{item.classList.remove('show');setTimeout(()=>item.remove(),300);},2500);
+}
+let _confirmCb=null;
+function showConfirm(msg,cb){document.getElementById('confirmMsg').textContent=msg;_confirmCb=cb;document.getElementById('confirmMask').classList.add('show');}
+function closeConfirm(){document.getElementById('confirmMask').classList.remove('show');_confirmCb=null;}
+function execConfirm(){const cb=_confirmCb;closeConfirm();if(cb)cb();}
+let _promptCb=null;
+function showPrompt(title,msg,defVal,cb){
+  document.getElementById('promptTitle').textContent=title;
+  document.getElementById('promptMsg').textContent=msg;
+  const input=document.getElementById('promptInput');input.value=defVal||'';
+  _promptCb=cb;document.getElementById('promptMask').classList.add('show');
+  setTimeout(()=>input.focus(),100);
+}
+function closePrompt(){document.getElementById('promptMask').classList.remove('show');_promptCb=null;}
+function execPrompt(){const v=document.getElementById('promptInput').value.trim();const cb=_promptCb;closePrompt();if(cb&&v)cb(v);}
+function onPromptKey(e){if(e.key==='Enter')execPrompt();if(e.key==='Escape')closePrompt();}
+
+/* ====== 资料中心（支持子目录浏览）====== */
+let INFO_NAV_PATH='';  // 当前浏览的路径，如 '合规' 或 '合规/子文件夹'
+const FILE_ICONS={'.pdf':'PDF','.doc':'DOC','.docx':'DOC','.xls':'XLS','.xlsx':'XLS','.ppt':'PPT','.pptx':'PPT',
+  '.png':'IMG','.jpg':'IMG','.jpeg':'IMG','.gif':'IMG','.webp':'IMG','.txt':'TXT','.md':'MD',
+  '.zip':'ZIP','.rar':'RAR','.7z':'7Z','.csv':'CSV','.mp4':'MP4','.mp3':'MP3'};
+const FILE_COLORS={'.pdf':'#ff6b6b','.doc':'#e8eef5','.docx':'#e8eef5','.xls':'#8eecd0','.xlsx':'#8eecd0',
+  '.ppt':'#ffd980','.pptx':'#ffd980','.png':'#c4b5e8','.jpg':'#c4b5e8','.jpeg':'#c4b5e8','.gif':'#c4b5e8','.webp':'#c4b5e8',
+  '.txt':'#b8c8d8','.md':'#b8c8d8','.zip':'#fbbf24','.rar':'#fbbf24','.7z':'#fbbf24',
+  '.csv':'#8eecd0','.mp4':'#f06595','.mp3':'#cc5de8'};
+
+function _encodePath(path){
+  return path.split('/').map(s=>encodeURIComponent(s)).join('/');
+}
+
+async function loadInfoSections(){
+  try{
+    const res=await fetch('/api/info/list?token='+encodeURIComponent(TOKEN));
+    if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
+    const data=await res.json();
+    renderInfoGrid(data);
+  }catch(e){document.getElementById('mainInfoGrid').innerHTML='<div class="empty-state">资料加载失败</div>';}
+}
+
+function renderInfoGrid(data){
+  const isAdmin=!!ROLE.is_admin;
+  let h='';
+  (data.dirs||[]).forEach(d=>{
+    h+=`<div class="info-card-item" onclick="openInfoBrowser('${esc(d.name)}')">
+      <div class="info-card-icon" style="color:var(--text-accent)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/>
+        </svg>
+      </div>
+      <div class="info-card-name">${esc(d.name)}</div>
+    </div>`;
+  });
+  if(isAdmin){
+    h+=`<div class="info-card-item info-card-add" onclick="promptCreateDir('')">
+      <div class="info-card-add-icon">+</div>
+      <div class="info-card-name">新建板块</div>
+    </div>`;
+  }
+  if(!h)h='<div class="empty-state">暂无资料</div>';
+  document.getElementById('mainInfoGrid').innerHTML=h;
+}
+
+function openInfoBrowser(path){
+  INFO_NAV_PATH=path;
+  document.getElementById('infoModal').classList.add('show');
+  loadInfoBrowser();
+}
+
+async function loadInfoBrowser(){
+  const isAdmin=!!ROLE.is_admin;
+  document.getElementById('infoModalTitle').textContent='资料中心';
+  document.getElementById('infoModalBody').innerHTML='<div class="loading">加载中...</div>';
+  try{
+    const url='/api/info/list'+(INFO_NAV_PATH?'/'+_encodePath(INFO_NAV_PATH):'')+'?token='+encodeURIComponent(TOKEN);
+    const res=await fetch(url);
+    if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
+    const data=await res.json();
+    renderInfoBrowser(data,isAdmin);
+  }catch(e){document.getElementById('infoModalBody').innerHTML='<div class="empty-state">加载失败</div>';}
+}
+
+function renderInfoBrowser(data,isAdmin){
+  let h='';
+  /* 面包屑导航 */
+  const crumbs=INFO_NAV_PATH?INFO_NAV_PATH.split('/'):[];
+  h+='<div class="info-breadcrumb">';
+  h+='<span class="info-crumb" onclick="infoNavTo(\'\')">全部</span>';
+  crumbs.forEach((c,i)=>{
+    const p=crumbs.slice(0,i+1).join('/');
+    h+='<span class="info-crumb-sep">/</span>';
+    h+=`<span class="info-crumb${i===crumbs.length-1?' active':''}" onclick="infoNavTo('${esc(p)}')">${esc(c)}</span>`;
+  });
+  h+='</div>';
+  /* 管理员工具栏 */
+  if(isAdmin){
+    h+=`<div class="info-toolbar">
+      <label class="info-upload-btn">+ 上传文件<input type="file" multiple style="display:none" onchange="uploadFiles(this.files)"></label>
+      <button class="info-mkdir-btn" onclick="promptCreateDir(INFO_NAV_PATH)">+ 新建文件夹</button>`;
+    if(INFO_NAV_PATH){
+      h+=`<button class="info-rmdir-btn" onclick="promptDeleteDir(INFO_NAV_PATH)">删除当前文件夹</button>`;
+    }
+    h+=`</div>`;
+  }
+  /* 子文件夹列表 */
+  if(data.dirs&&data.dirs.length){
+    h+='<div class="info-folder-list">';
+    data.dirs.forEach(d=>{
+      const subPath=INFO_NAV_PATH?INFO_NAV_PATH+'/'+d.name:d.name;
+      const nameClass=isAdmin?'info-folder-name info-folder-name-editable':'info-folder-name';
+      const dblClick=isAdmin?` ondblclick="event.stopPropagation();promptRenameDir('${esc(subPath)}')"`:'';
+      h+=`<div class="info-folder-item" onclick="infoNavTo('${esc(subPath)}')">
+        <span class="info-folder-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/>
+          </svg>
+        </span>
+        <span class="${nameClass}"${dblClick}>${esc(d.name)}</span>
+        <span class="info-folder-arrow">&#10095;</span>
+      </div>`;
+    });
+    h+='</div>';
+  }
+  /* 文件列表 */
+  if(data.files&&data.files.length){
+    h+='<div class="info-file-list">';
+    data.files.forEach(f=>{
+      const iconLabel=FILE_ICONS[f.ext]||'FILE';
+      const iconColor=FILE_COLORS[f.ext]||'#b8c8d8';
+      const sizeStr=formatSize(f.size);
+      const fileFullPath=INFO_NAV_PATH?INFO_NAV_PATH+'/'+f.name:f.name;
+      const encodedPath=_encodePath(fileFullPath);
+      const isZip=f.ext==='.zip';
+      let actionHtml;
+      if(isZip){
+        actionHtml=`<span class="info-file-action" onclick="event.preventDefault();previewZip('${esc(fileFullPath)}')">查看列表</span>`;
+      }else if(f.preview){
+        actionHtml='<span class="info-file-action">预览</span>';
+      }else{
+        actionHtml='<span class="info-file-action">下载</span>';
+      }
+      const downloadUrl=`/api/info/file/${encodedPath}?token=${encodeURIComponent(TOKEN)}`;
+      const target=f.preview?'_blank':'_self';
+      h+=`<div class="info-file-item">
+        <a href="${downloadUrl}" target="${target}" class="info-file-link" style="text-decoration:none">
+          <span class="info-file-badge" style="background:${iconColor}22;color:${iconColor}">${iconLabel}</span>
+          <span class="info-file-name">${esc(f.name)}</span>
+          <span class="info-file-size">${sizeStr}</span>
+          ${actionHtml}
+        </a>`;
+      if(isAdmin){
+        h+=`<button class="info-file-del" onclick="event.preventDefault();promptDeleteFile('${esc(fileFullPath)}')">&times;</button>`;
+      }
+      h+=`</div>`;
+    });
+    h+='</div>';
+  }
+  if((!data.dirs||!data.dirs.length)&&(!data.files||!data.files.length)){
+    h+='<div class="empty-state">该文件夹为空</div>';
+  }
+  document.getElementById('infoModalBody').innerHTML=h;
+}
+
+function infoNavTo(path){
+  INFO_NAV_PATH=path;
+  loadInfoBrowser();
+}
+
+function closeInfoModal(){document.getElementById('infoModal').classList.remove('show');}
+
+/* 新建文件夹/板块 */
+function promptCreateDir(parentPath){
+  const label=parentPath?'请输入文件夹名称：':'请输入板块名称：';
+  showPrompt('新建文件夹',label,'',(name)=>{
+    const full=parentPath?parentPath+'/'+name:name;
+    createDir(full);
+  });
+}
+
+/* 重命名文件夹（管理员双击触发） */
+function promptRenameDir(path){
+  const oldName=path.split('/').pop();
+  showPrompt('重命名','请输入新的文件夹名称：',oldName,(newName)=>{
+    if(newName===oldName)return;
+    renameDir(path,newName);
+  });
+}
+async function renameDir(path,newName){
+  try{
+    const res=await fetch('/api/admin/info/rename/'+_encodePath(path)+'?token='+encodeURIComponent(TOKEN),
+      {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({new_name:newName})});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'改名失败','error');return;}
+    showToast('改名成功','success');
+    const data=await res.json();
+    const parent=path.includes('/')?path.substring(0,path.lastIndexOf('/')):'';
+    infoNavTo(parent);
+    await loadInfoSections();
+  }catch(e){showToast('网络错误','error');}
+}
+async function createDir(path){
+  try{
+    const res=await fetch('/api/admin/info/dir/'+_encodePath(path)+'?token='+encodeURIComponent(TOKEN),{method:'POST'});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'创建失败','error');return;}
+    showToast('创建成功','success');
+    await loadInfoSections();
+    if(INFO_NAV_PATH.startsWith(path.split('/').slice(0,-1).join('/')))loadInfoBrowser();
+  }catch(e){showToast('网络错误','error');}
+}
+
+/* 删除文件夹 */
+function promptDeleteDir(path){
+  showConfirm('确定删除文件夹「'+path.split('/').pop()+'」及其所有内容？',()=>deleteDir(path));
+}
+async function deleteDir(path){
+  try{
+    const res=await fetch('/api/admin/info/dir/'+_encodePath(path)+'?token='+encodeURIComponent(TOKEN),{method:'DELETE'});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'删除失败','error');return;}
+    showToast('已删除','success');
+    const parent=path.includes('/')?path.substring(0,path.lastIndexOf('/')):'';
+    infoNavTo(parent);
+    await loadInfoSections();
+  }catch(e){showToast('网络错误','error');}
+}
+
+/* 上传文件 */
+async function uploadFiles(files){
+  if(!files||!files.length)return;
+  for(const file of files){
+    try{
+      const fd=new FormData();fd.append('file',file);
+      const res=await fetch('/api/admin/info/upload/'+_encodePath(INFO_NAV_PATH)+'?token='+encodeURIComponent(TOKEN),{method:'POST',body:fd});
+      if(!res.ok){const d=await res.json();showToast('上传失败: '+file.name+' - '+(d.detail||''),'error');return;}
+    }catch(e){showToast('上传失败: '+file.name,'error');return;}
+  }
+  showToast('上传完成','success');
+  loadInfoBrowser();
+}
+
+/* 删除文件 */
+function promptDeleteFile(path){
+  showConfirm('确定删除「'+path.split('/').pop()+'」？',()=>deleteFile(path));
+}
+async function deleteFile(path){
+  try{
+    const res=await fetch('/api/admin/info/file/'+_encodePath(path)+'?token='+encodeURIComponent(TOKEN),{method:'DELETE'});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'删除失败','error');return;}
+    showToast('已删除','success');
+    loadInfoBrowser();
+    await loadInfoSections();
+  }catch(e){showToast('网络错误','error');}
+}
+
+/* ZIP 文件列表预览 */
+async function previewZip(path){
+  const body=document.getElementById('infoModalBody');
+  body.innerHTML='<div class="loading">读取ZIP内容...</div>';
+  try{
+    const res=await fetch('/api/info/zip/'+_encodePath(path)+'?token='+encodeURIComponent(TOKEN));
+    if(!res.ok){const d=await res.json();showToast(d.detail||'读取失败','error');loadInfoBrowser();return;}
+    const data=await res.json();
+    let h='<div class="info-breadcrumb"><span class="info-crumb" onclick="loadInfoBrowser()">&#8592; 返回</span>';
+    h+='<span class="info-crumb active">'+esc(data.name)+'（共'+data.total+'个文件）</span></div>';
+    h+='<div class="info-zip-list">';
+    data.entries.forEach(e=>{
+      h+=`<div class="info-zip-item">
+        <span class="info-file-badge" style="background:#fbbf2422;color:#fbbf24">FILE</span>
+        <span class="info-file-name">${esc(e.name)}</span>
+        <span class="info-file-size">${formatSize(e.size)}</span>
+      </div>`;
+    });
+    h+='</div>';
+    body.innerHTML=h;
+  }catch(e){showToast('读取失败','error');loadInfoBrowser();}
+}
+
+function formatSize(bytes){
+  if(bytes<1024)return bytes+' B';
+  if(bytes<1048576)return (bytes/1024).toFixed(1)+' KB';
+  if(bytes<1073741824)return (bytes/1048576).toFixed(1)+' MB';
+  return (bytes/1073741824).toFixed(1)+' GB';
 }
