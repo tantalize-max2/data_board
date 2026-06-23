@@ -718,15 +718,14 @@ function renderInfoBrowser(data,isAdmin){
     h+='<div class="info-folder-list">';
     data.dirs.forEach(d=>{
       const subPath=INFO_NAV_PATH?INFO_NAV_PATH+'/'+d.name:d.name;
-      const nameClass=isAdmin?'info-folder-name info-folder-name-editable':'info-folder-name';
-      const dblClick=isAdmin?` ondblclick="event.stopPropagation();promptRenameDir('${esc(subPath)}')"`:'';
-      h+=`<div class="info-folder-item" onclick="infoNavTo('${esc(subPath)}')">
-        <span class="info-folder-icon">
+      h+=`<div class="info-folder-item" onclick="infoFolderItemClick('${esc(subPath)}',event)">`;
+      const nameExtra=isAdmin?` ondblclick="event.stopPropagation();inlineRename(this)" title="双击重命名"`:'';
+      h+=`<span class="info-folder-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2H5a2 2 0 0 0-2 2z"/>
           </svg>
         </span>
-        <span class="${nameClass}"${dblClick}>${esc(d.name)}</span>
+        <span class="info-folder-name${isAdmin?' info-folder-name-editable':''}" data-path="${esc(subPath)}"${nameExtra}>${esc(d.name)}</span>
         <span class="info-folder-arrow">&#10095;</span>
       </div>`;
     });
@@ -788,25 +787,44 @@ function promptCreateDir(parentPath){
   });
 }
 
-/* 重命名文件夹（管理员双击触发） */
-function promptRenameDir(path){
-  const oldName=path.split('/').pop();
-  showPrompt('重命名','请输入新的文件夹名称：',oldName,(newName)=>{
-    if(newName===oldName)return;
-    renameDir(path,newName);
-  });
+/* 行内重命名文件夹（管理员双击触发） */
+let _folderClickTimer=null;
+function infoFolderItemClick(path,ev){
+  clearTimeout(_folderClickTimer);
+  _folderClickTimer=setTimeout(()=>{infoNavTo(path);},300);
 }
-async function renameDir(path,newName){
-  try{
-    const res=await fetch('/api/admin/info/rename/'+_encodePath(path)+'?token='+encodeURIComponent(TOKEN),
-      {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({new_name:newName})});
-    if(!res.ok){const d=await res.json();showToast(d.detail||'改名失败','error');return;}
-    showToast('改名成功','success');
-    const data=await res.json();
-    const parent=path.includes('/')?path.substring(0,path.lastIndexOf('/')):'';
-    infoNavTo(parent);
-    await loadInfoSections();
-  }catch(e){showToast('网络错误','error');}
+function inlineRename(el){
+  clearTimeout(_folderClickTimer);
+  const path=el.dataset.path;
+  const oldName=path.split('/').pop();
+  el.contentEditable='true';
+  el.classList.add('editing');
+  el.focus();
+  /* 全选文字 */
+  const range=document.createRange();range.selectNodeContents(el);
+  const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
+  const finish=async(save)=>{
+    el.contentEditable='false';el.classList.remove('editing');
+    el.onkeydown=null;el.onblur=null;
+    const newName=el.textContent.trim();
+    if(!save||newName===oldName){el.textContent=oldName;return;}
+    if(!newName){el.textContent=oldName;showToast('名称不能为空','error');return;}
+    try{
+      const res=await fetch('/api/admin/info/rename/'+_encodePath(path)+'?token='+encodeURIComponent(TOKEN),
+        {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({new_name:newName})});
+      if(!res.ok){const d=await res.json();el.textContent=oldName;showToast(d.detail||'改名失败','error');return;}
+      showToast('改名成功','success');
+      const parent=path.includes('/')?path.substring(0,path.lastIndexOf('/')):'';
+      el.dataset.path=parent?parent+'/'+newName:newName;
+      await loadInfoSections();
+      loadInfoBrowser();
+    }catch(e){el.textContent=oldName;showToast('网络错误','error');}
+  };
+  el.onkeydown=function(e){
+    if(e.key==='Enter'){e.preventDefault();finish(true);}
+    if(e.key==='Escape'){e.preventDefault();finish(false);}
+  };
+  el.onblur=function(){finish(true);};
 }
 async function createDir(path){
   try{
