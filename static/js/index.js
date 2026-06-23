@@ -875,6 +875,7 @@ async function folderDrop(e){
     if(!res.ok){const d=await res.json();showToast(d.detail||'排序失败','error');return;}
     showToast('排序已保存','success');
     await loadInfoSections();
+    loadInfoBrowser();
   }catch(e){showToast('网络错误','error');}
 }
 function folderDragEnd(e){
