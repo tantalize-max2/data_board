@@ -45,6 +45,8 @@ services:
       UVICORN_WORKERS: 4
     ports:
       - "127.0.0.1:8000:8000"   # 仅本机，nginx代理
+    volumes:
+      - info_data:/app/info      # 资料中心文件持久化
     depends_on:
       mysql:
         condition: service_healthy
@@ -63,3 +65,4 @@ services:
 
 volumes:
   mysql_data:
+  info_data:
