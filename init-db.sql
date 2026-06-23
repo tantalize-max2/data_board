@@ -1,6 +1,7 @@
 -- 夏收行动部署看板 - 数据库初始化
 -- Docker 首次启动时自动执行
 
+SET NAMES utf8mb4;
 CREATE DATABASE IF NOT EXISTS xiashou2 DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE xiashou2;
 

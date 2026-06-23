@@ -54,6 +54,8 @@ def _create_pool():
                 maxconnections=int(os.getenv('DB_POOL_MAX_CONN', '50')),
                 blocking=True,
                 ping=1,  # 连接使用前自动检测是否断开
+                # 每个连接取出时强制设置字符集，防止中文乱码
+                setsession=["SET NAMES utf8mb4"],
                 **DB_CONFIG
             )
             logger.info('数据库连接池创建成功 (attempt %d/%d)', attempt, max_retries)
