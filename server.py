@@ -11,7 +11,7 @@
 API 兼容：原有 6 个业务接口签名不变，前端无需改动调用方式。
 新增：/api/roles, /api/admin/* 一组管理接口。
 """
-import os, hashlib, time, secrets, threading
+import os, hashlib, time, hmac, base64, json, secrets, threading
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, FileResponse
@@ -25,17 +25,35 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 app = FastAPI(title="夏收行动部署看板")
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
-# ====== 会话（内存，TTL 8 小时）======
-SESSIONS: Dict[str, dict] = {}
-SESSION_TTL = 3600 * 8
-# 每 10 分钟清理过期会话
-def _clean_sessions():
-    now = time.time()
-    expired = [k for k, v in SESSIONS.items() if now > v["expire"]]
-    for k in expired:
-        SESSIONS.pop(k, None)
-    threading.Timer(600, _clean_sessions).start()
-_clean_sessions()
+# ====== 签名 Token（无状态，多 worker 共享）======
+# 格式: base64(payload).base64(hmac_signature)
+# payload: {username, role_id, is_admin, expire}
+TOKEN_TTL = 3600 * 8  # 8 小时
+_TOKEN_SECRET = os.getenv("TOKEN_SECRET", "xiashou-secret-2026")
+
+def _sign(payload: dict) -> str:
+    """生成 HMAC-SHA256 签名 token"""
+    payload_b = base64.urlsafe_b64encode(json.dumps(payload, separators=(',', ':')).encode())
+    sig = hmac.new(_TOKEN_SECRET.encode(), payload_b, hashlib.sha256).digest()
+    sig_b = base64.urlsafe_b64encode(sig)
+    return f"{payload_b.decode()}.{sig_b.decode()}"
+
+def _verify(token: str) -> Optional[dict]:
+    """验证签名 token，返回 payload 或 None"""
+    if not token or '.' not in token:
+        return None
+    try:
+        payload_b, sig_b = token.split('.', 1)
+        expected_sig = hmac.new(_TOKEN_SECRET.encode(), payload_b.encode(), hashlib.sha256).digest()
+        expected_sig_b = base64.urlsafe_b64encode(expected_sig).decode()
+        if not hmac.compare_digest(sig_b, expected_sig_b):
+            return None
+        payload = json.loads(base64.urlsafe_b64decode(payload_b))
+        if time.time() > payload.get("expire", 0):
+            return None
+        return payload
+    except Exception:
+        return None
 
 # ====== 简易内存缓存（线程安全）======
 _CACHE: Dict[str, tuple] = {}  # key → (value, expire_time)
@@ -71,13 +89,8 @@ def verify_password(stored_hash: str, salt: str, pwd: str) -> bool:
 
 
 def get_session(token: str) -> Optional[dict]:
-    s = SESSIONS.get(token)
-    if not s:
-        return None
-    if time.time() > s["expire"]:
-        SESSIONS.pop(token, None)
-        return None
-    return s
+    """验证签名 token，返回 payload 或 None（多 worker 共享，无需内存存储）"""
+    return _verify(token)
 
 
 def require_session(request: Request) -> dict:
@@ -321,20 +334,18 @@ async def login(request: Request):
     if not user or not verify_password(user["password_hash"], user["password_salt"], pwd):
         raise HTTPException(401, "岗位或密码错误")
     info = get_user_info(rid)
-    token = secrets.token_hex(32)
-    SESSIONS[token] = {
+    token = _sign({
         "username": user["username"],
         "role_id": user["role_id"],
         "is_admin": bool(user["is_admin"]),
-        "expire": time.time() + SESSION_TTL,
-    }
+        "expire": time.time() + TOKEN_TTL,
+    })
     return {"token": token, "role": info}
 
 
 @app.post("/api/logout")
 async def logout(request: Request):
-    body = await request.json()
-    SESSIONS.pop(body.get("token", ""), None)
+    # 无状态 token，服务端无需删除，客户端丢弃即可
     return {"ok": True}
 
 
