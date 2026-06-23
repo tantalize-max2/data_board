@@ -19,6 +19,7 @@ RUN python -c "import re;c=open('requirements.txt',encoding='utf-8').read();open
 # 应用代码
 COPY db.py server.py ./
 COPY static/ ./static/
+COPY info/ ./info/
 
 EXPOSE 8000
 
