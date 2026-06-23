@@ -863,7 +863,7 @@ async function folderDrop(e){
   if(!_dragSrcEl)return;
   const list=document.getElementById('folderList');
   if(!list)return;
-  const items=Array.from(list.querySelectorAll('.info-folder-item')).map(el=>el.dataset.name);
+  const items=Array.from(list.querySelectorAll('.info-folder-item')).map(el=>el.dataset.raw);
   folderDragEnd(e);
   if(!items.length)return;
   try{

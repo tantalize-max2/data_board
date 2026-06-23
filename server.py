@@ -1004,7 +1004,9 @@ def _strip_order_prefix(name: str) -> str:
 
 @app.put("/api/admin/info/reorder")
 async def admin_reorder(request: Request):
-    """重新排序同级目录。body: {"parent": "父路径", "items": ["文件夹A","文件夹B",...]}"""
+    """重新排序同级目录。body: {"parent": "父路径", "items": ["raw_name1","raw_name2",...]}
+    用数字前缀实现排序，已有前缀的会被覆盖。
+    """
     require_admin(request)
     body = await request.json()
     parent = (body.get("parent") or "").strip('/')
@@ -1014,21 +1016,35 @@ async def admin_reorder(request: Request):
     base = _safe_info_path(parent) if parent else INFO_DIR
     if not os.path.isdir(base):
         raise HTTPException(404, "目录不存在")
-    # 先全部重命名为临时名，避免改名时名称冲突
-    temp_names = {}
-    for idx, item in enumerate(items):
-        item = os.path.basename(item)
-        old_path = os.path.join(base, item)
+
+    import re
+    # 第一步：去掉所有已有前缀，还原原始名称
+    rename_map = {}  # old_raw -> display_name
+    for raw in items:
+        raw = os.path.basename(raw)
+        old_path = os.path.join(base, raw)
         if not os.path.isdir(old_path):
             continue
-        tmp_path = os.path.join(base, f"__tmp_reorder_{idx}")
-        os.rename(old_path, tmp_path)
-        temp_names[tmp_path] = item
-    # 再按新顺序加上前缀
-    for idx, (tmp_path, item) in enumerate(sorted(temp_names.keys(), key=lambda k: int(k.split('_')[-1]))):
+        display = re.sub(r'^\d{2}[._]\s*', '', raw)
+        rename_map[raw] = display
+
+    # 第二步：全部先重命名为唯一临时名（用 pid 防冲突）
+    import tempfile
+    tmp_dir = tempfile.mkdtemp(dir=base)
+    tmp_map = {}  # display -> tmp_path
+    for raw, display in rename_map.items():
+        tmp_path = os.path.join(tmp_dir, display)
+        os.rename(os.path.join(base, raw), tmp_path)
+        tmp_map[display] = tmp_path
+
+    # 第三步：从临时目录按新顺序移回，加前缀
+    for idx, display in enumerate(rename_map.values()):
         prefix = f"{idx:02d}_"
-        new_path = os.path.join(base, prefix + temp_names[tmp_path])
-        os.rename(tmp_path, new_path)
+        new_path = os.path.join(base, prefix + display)
+        os.rename(tmp_map[display], new_path)
+
+    # 清理临时目录
+    os.rmdir(tmp_dir)
     return {"ok": True}
 
 
