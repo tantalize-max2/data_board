@@ -94,8 +94,9 @@ async function loadMainPage(){
     renderBattleGrid(data.battles);
     if(isAdmin) renderZoneGrid(data.zones);
     renderTroopOverview(data.zones);
-    loadInfoSections();
   }catch(e){document.getElementById('mainBattleGrid').innerHTML='<div class="empty-state">加载失败</div>';}
+  /* 资料中心独立加载，不受 overview 失败影响，确保所有用户都能看到 */
+  loadInfoSections();
 }
 
 function renderBattleGrid(battles){
