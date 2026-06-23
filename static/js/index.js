@@ -7,7 +7,7 @@ let TOKEN='',ROLE=null;
   try{
     const res=await fetch('/api/roles');
     const groups=await res.json();
-    ['管理层','公众战区','商业战区','教科战区','行业战区'].forEach((g,idx)=>{
+    ['管理层','公众战区','商业战区','校园战区','行业战区'].forEach((g,idx)=>{
       if(!groups[g])return;
       if(idx>0){const sep=document.createElement('option');sep.disabled=true;sep.text='──────────';sep.style.color='var(--cyan)';sep.style.fontWeight='700';sel.appendChild(sep);}
       const head=document.createElement('option');head.disabled=true;head.text='【 '+g+' 】';head.style.color='var(--cyan)';head.style.fontWeight='700';sel.appendChild(head);
