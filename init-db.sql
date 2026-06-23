@@ -35,7 +35,9 @@ CREATE TABLE IF NOT EXISTS users (
   color VARCHAR(20) DEFAULT '#1565c0',
   is_admin TINYINT DEFAULT 0,
   is_active TINYINT DEFAULT 1,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_by VARCHAR(64) DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 角色权限表
@@ -44,6 +46,7 @@ CREATE TABLE IF NOT EXISTS role_access (
   role_id VARCHAR(64) NOT NULL,
   battle_id VARCHAR(32) NOT NULL,
   warzone_id VARCHAR(32) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_role_bw (role_id, battle_id, warzone_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -52,21 +55,21 @@ CREATE TABLE IF NOT EXISTS deployment_records (
   id INT AUTO_INCREMENT PRIMARY KEY,
   battle_id VARCHAR(32) DEFAULT NULL,
   battle_no VARCHAR(32) DEFAULT '',
-  battle_name VARCHAR(100) DEFAULT '',
+  battle_name VARCHAR(128) DEFAULT '',
   battle_target TEXT,
   warzone_id VARCHAR(32) DEFAULT NULL,
-  warzone_name VARCHAR(100) DEFAULT '',
+  warzone_name VARCHAR(64) DEFAULT '',
   warzone_target TEXT,
   path_no VARCHAR(32) DEFAULT '',
-  path_name VARCHAR(200) DEFAULT '',
+  path_name VARCHAR(256) DEFAULT '',
   path_target TEXT,
   scene_no VARCHAR(32) DEFAULT '',
-  scene_title VARCHAR(200) DEFAULT '',
+  scene_title VARCHAR(256) DEFAULT '',
   scene_name TEXT,
-  guide_role VARCHAR(200) DEFAULT '',
-  combat_role VARCHAR(200) DEFAULT '',
-  opportunity_source VARCHAR(200) DEFAULT '',
-  control_cycle VARCHAR(100) DEFAULT '',
+  guide_role VARCHAR(256) DEFAULT '',
+  combat_role VARCHAR(256) DEFAULT '',
+  opportunity_source TEXT,
+  control_cycle VARCHAR(128) DEFAULT '',
   control_action TEXT,
   control_target TEXT,
   policy TEXT,
@@ -75,8 +78,12 @@ CREATE TABLE IF NOT EXISTS deployment_records (
   closed_loop_control TEXT,
   process_flow TEXT,
   sort_order INT DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) DEFAULT '',
-  INDEX idx_battle_warzone (battle_id, warzone_id),
+  INDEX idx_battle (battle_id),
+  INDEX idx_warzone (warzone_id),
+  INDEX idx_path (path_no),
   INDEX idx_sort (sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -93,7 +100,7 @@ INSERT IGNORE INTO battles (id, name, color, sort_order) VALUES
 INSERT IGNORE INTO warzones (id, name, color, sort_order) VALUES
 ('public', '公众战区', '#1565c0', 1),
 ('business', '商业战区', '#2e7d32', 2),
-('education', '教科战区', '#7b1fa2', 3),
+('education', '校园战区', '#7b1fa2', 3),
 ('industry', '行业战区', '#e65100', 4);
 
 -- 管理员默认账号（密码 123456）
