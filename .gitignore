@@ -8,6 +8,9 @@ venv/
 # 临时脚本与中间产物（仅本机使用）
 .temp/
 
+# 测试数据与源文件（仅本机使用）
+test/
+
 # IDE
 .vscode/
 .idea/
