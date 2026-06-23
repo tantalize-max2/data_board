@@ -513,7 +513,16 @@ def battle_zones(battle_id: str, request: Request):
         w = wl.get(zid)
         if w:
             zone_list.append({"id": w["id"], "name": w["name"], "color": w["color"], "count": cnt})
-    return {"role": get_user_info(s["username"]), "battle": {"id": b["id"], "name": b["name"], "color": b["color"]},
+    battle_target = ""
+    bt_count: Dict[str, int] = {}
+    for r in b_rows:
+        bt = str(r.get("battle_target", "") or "").strip()
+        if bt and bt != "-":
+            bt_count[bt] = bt_count.get(bt, 0) + 1
+    if bt_count:
+        battle_target = max(bt_count, key=bt_count.get)
+    return {"role": get_user_info(s["username"]),
+            "battle": {"id": b["id"], "name": b["name"], "color": b["color"], "target": battle_target},
             "zones": zone_list, "total": len(b_rows)}
 
 

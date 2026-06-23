@@ -309,6 +309,10 @@ body>*{position:relative;z-index:1}
   word-break:break-all;letter-spacing:.5px}
 .field-value.empty{color:var(--text-dim);font-style:italic;font-weight:400}
 
+.target-text{padding:18px 24px;font-size:16px;color:var(--text-accent);font-weight:700;line-height:1.8;
+  letter-spacing:1px;white-space:pre-wrap;word-break:break-all;
+  border-left:3px solid var(--cyan);background:rgba(0,212,255,.05);border-radius:0 var(--radius) var(--radius) 0}
+
 .path-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:18px}
 .path-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
   box-shadow:var(--shadow-panel);padding:24px 26px;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
@@ -341,11 +345,12 @@ body>*{position:relative;z-index:1}
 .loading{text-align:center;padding:40px;color:var(--text-dim);font-size:13px;letter-spacing:1px}
 
 /* ==================== 悬停预览浮层 ==================== */
-.hover-tip{position:fixed;z-index:2000;max-width:520px;max-height:60vh;overflow-y:auto;
+.hover-tip{position:fixed;z-index:2000;max-width:460px;max-height:50vh;overflow-y:auto;
   background:linear-gradient(170deg,var(--bg-panel),var(--bg-dark));
-  border:1px solid var(--border-hover);border-radius:6px;padding:16px 20px;
+  border:1px solid var(--border-hover);border-radius:6px;padding:14px 18px;
   box-shadow:0 0 40px rgba(0,212,255,.12),0 12px 40px rgba(0,0,0,.5);
-  display:none;font-size:12px;line-height:1.7;scrollbar-width:thin;scrollbar-color:var(--border-hover) transparent}
+  display:none;font-size:12px;line-height:1.6;scrollbar-width:thin;scrollbar-color:var(--border-hover) transparent;
+  pointer-events:none}
 .hover-tip::-webkit-scrollbar{width:5px}
 .hover-tip::-webkit-scrollbar-track{background:transparent}
 .hover-tip::-webkit-scrollbar-thumb{background:var(--border-hover);border-radius:3px}

@@ -31,6 +31,7 @@ let TOKEN='',ROLE=null;
   }
 })();
 document.getElementById('txtPwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+window.addEventListener('scroll',()=>{const tip=document.getElementById('hoverTip');if(tip)tip.classList.remove('show');},{passive:true});
 
 function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -138,7 +139,11 @@ async function openBattleZones(bid){
     const data=await res.json();
     document.getElementById('bzTitle').textContent=data.battle.name;
     document.getElementById('bzInfo').textContent='共'+data.total+'条数据';
-    let h='<div class="section-label">请选择战区</div><div class="card-grid-4">';
+    let h='';
+    if(data.battle.target){
+      h+=`<div class="module-section"><div class="module-title">战役总目标</div><div class="info-card"><div class="target-text">${esc(data.battle.target)}</div></div></div>`;
+    }
+    h+='<div class="section-label">请选择战区</div><div class="card-grid-4">';
     data.zones.forEach(z=>{
       h+=`<div class="card-item card-center" onclick="openDetail('${bid}','${z.id}')">
         <div class="card-name" style="color:${mapBattleColor(z.color)}">${esc(z.name)}</div>
@@ -313,7 +318,7 @@ const UNIT_FIELDS=[
   ['最短管控目标（积分/金额）','最短管控目标（积分/金额）'],
   ['政策','政策'],
   ['激励','激励'],
-  ['标准话术','标准话术'],
+  ['标准话术/动作','标准话术'],
   ['闭环管控','闭环管控'],
   ['受理到交付的流程','受理到交付的流程'],
 ];
@@ -426,22 +431,21 @@ function showHoverTip(e,innerHtml){
   let tip=document.getElementById('hoverTip');
   if(!tip){
     tip=document.createElement('div');tip.id='hoverTip';tip.className='hover-tip';document.body.appendChild(tip);
-    tip.addEventListener('mouseenter',()=>clearTimeout(HOVER_TIMER));
-    tip.addEventListener('mouseleave',()=>{HOVER_TIMER=setTimeout(hideHoverPreview,200);});
   }
   tip.innerHTML=innerHtml;tip.classList.add('show');
   const rect=e.currentTarget.getBoundingClientRect();
   const tw=tip.offsetWidth,th=tip.offsetHeight;
-  let left=rect.left;
+  let left=rect.left+(rect.width/2)-(tw/2);
+  if(left<10)left=10;
   if(left+tw>window.innerWidth-10)left=Math.max(10,window.innerWidth-tw-10);
-  let top=rect.bottom+8;
-  if(top+th>window.innerHeight-10)top=Math.max(10,rect.top-th-8);
+  let top=rect.top-th-8;
+  if(top<10)top=rect.bottom+8;
   tip.style.left=left+'px';tip.style.top=top+'px';
 }
 function hideHoverPreview(){
   HOVER_TIMER=setTimeout(()=>{
     const tip=document.getElementById('hoverTip');if(tip)tip.classList.remove('show');
-  },200);
+  },150);
 }
 
 async function hoverPathScenes(e,ck,pname){
