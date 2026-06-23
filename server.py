@@ -884,15 +884,45 @@ _PREVIEW_EXTS = {'.pdf', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.txt', '.md'
 _ALLOWED_EXTS = _PREVIEW_EXTS | {'.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
                                   '.zip', '.rar', '.7z', '.csv', '.mp4', '.mp3'}
 
+import re as _re
+
+def _strip_order_prefix(name: str) -> str:
+    """去掉文件夹名前面的排序前缀 'NN_' 或 'NN.'"""
+    return _re.sub(r'^\d{2}[._]\s*', '', name)
+
 
 def _safe_info_path(subpath: str = "") -> str:
-    """安全解析 info 子路径，防止路径穿越"""
+    """安全解析 info 子路径，防止路径穿越。
+    自动匹配带排序前缀的实际文件名（如 '合规' → '00_合规'）。
+    """
     base = os.path.normpath(INFO_DIR)
     sub = subpath.strip().strip('/').strip('\\')
-    full = os.path.normpath(os.path.join(base, sub)) if sub else base
-    if not full.startswith(base):
+    if not sub:
+        return base
+    current = base
+    for segment in sub.replace('\\', '/').split('/'):
+        if not segment:
+            continue
+        # 先精确匹配
+        candidate = os.path.normpath(os.path.join(current, segment))
+        if os.path.exists(candidate):
+            current = candidate
+            continue
+        # 再尝试匹配去掉前缀后的名称（如 '合规' → '00_合规'）
+        if os.path.isdir(current):
+            matched = False
+            for name in os.listdir(current):
+                if _strip_order_prefix(name) == segment:
+                    current = os.path.normpath(os.path.join(current, name))
+                    matched = True
+                    break
+            if matched:
+                continue
+        # 都没匹配上，用原始路径（后续会 404）
+        current = candidate
+    if not current.startswith(base):
         raise HTTPException(400, "路径非法")
-    return full
+    return current
 
 
 @app.get("/api/info/list")
@@ -909,7 +939,10 @@ def info_list(request: Request, folder: str = ""):
     dir_names = sorted([n for n in all_items if os.path.isdir(os.path.join(dp, n))])
     file_names = sorted([n for n in all_items if os.path.isfile(os.path.join(dp, n))])
     for name in dir_names:
-        dirs.append({"name": _strip_order_prefix(name), "raw_name": name, "type": "dir"})
+        full = os.path.join(dp, name)
+        # 统计该子目录下所有文件数（含子目录递归）
+        count = sum(len(fs) for _, _, fs in os.walk(full))
+        dirs.append({"name": _strip_order_prefix(name), "raw_name": name, "type": "dir", "count": count})
     for name in file_names:
         fp = os.path.join(dp, name)
         ext = os.path.splitext(name)[1].lower()
@@ -994,12 +1027,6 @@ def admin_rmdir(folder: str, request: Request):
         raise HTTPException(400, "不能删除根目录")
     shutil.rmtree(dp)
     return {"ok": True}
-
-
-def _strip_order_prefix(name: str) -> str:
-    """去掉文件夹名前面的排序前缀 'NN_' 或 'NN.'"""
-    import re
-    return re.sub(r'^\d{2}[._]\s*', '', name)
 
 
 @app.put("/api/admin/info/reorder")

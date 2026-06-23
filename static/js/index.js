@@ -660,6 +660,7 @@ function renderInfoGrid(data){
         </svg>
       </div>
       <div class="info-card-name">${esc(d.name)}</div>
+      <div class="info-card-count">${d.count||0} 个文件</div>
     </div>`;
   });
   if(isAdmin){
@@ -728,6 +729,7 @@ function renderInfoBrowser(data,isAdmin){
           </svg>
         </span>
         <span class="info-folder-name${isAdmin?' info-folder-name-editable':''}" data-path="${esc(subPath)}"${nameExtra}>${esc(d.name)}</span>
+        <span class="info-folder-count">${d.count||0} 个文件</span>
         <span class="info-folder-arrow">&#10095;</span>
       </div>`;
     });
