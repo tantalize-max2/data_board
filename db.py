@@ -5,8 +5,12 @@
 配置通过环境变量注入，本地开发可用 .env 文件或默认值。
 """
 import os
+import time
+import logging
 import pymysql
 from dbutils.pooled_db import PooledDB
+
+logger = logging.getLogger('db')
 
 # ---- 本地开发 SSL 补丁（Linux 服务器无需，但保留无副作用）----
 import ssl as _ssl
@@ -32,19 +36,44 @@ DB_CONFIG = dict(
     autocommit=True,
 )
 
-_pool = PooledDB(
-    creator=pymysql,
-    mincached=int(os.getenv('DB_POOL_MIN', '4')),
-    maxcached=int(os.getenv('DB_POOL_MAX', '20')),
-    maxconnections=int(os.getenv('DB_POOL_MAX_CONN', '50')),
-    blocking=True,
-    ping=1,  # 连接使用前自动检测是否断开
-    **DB_CONFIG
-)
+# ---- 懒加载连接池（首次查询时创建，带重试，避免启动即崩溃）----
+_pool = None
+
+def _create_pool():
+    """创建连接池，带重试逻辑（最多 30 次，间隔 2 秒，共等 1 分钟）"""
+    global _pool
+    max_retries = int(os.getenv('DB_CONNECT_RETRIES', '30'))
+    retry_interval = int(os.getenv('DB_CONNECT_INTERVAL', '2'))
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            pool = PooledDB(
+                creator=pymysql,
+                mincached=int(os.getenv('DB_POOL_MIN', '4')),
+                maxcached=int(os.getenv('DB_POOL_MAX', '20')),
+                maxconnections=int(os.getenv('DB_POOL_MAX_CONN', '50')),
+                blocking=True,
+                ping=1,  # 连接使用前自动检测是否断开
+                **DB_CONFIG
+            )
+            logger.info('数据库连接池创建成功 (attempt %d/%d)', attempt, max_retries)
+            return pool
+        except Exception as e:
+            logger.warning('数据库连接失败 (attempt %d/%d): %s', attempt, max_retries, e)
+            if attempt < max_retries:
+                time.sleep(retry_interval)
+
+    # 重试耗尽，抛出异常（container restart: always 会重启）
+    raise RuntimeError(f'数据库连接失败，已重试 {max_retries} 次')
 
 
 def get_conn():
-    """从连接池获取一个连接（用完需 close，实际是归还池）"""
+    """从连接池获取一个连接（用完需 close，实际是归还池）。
+    连接池懒加载：首次调用时创建，避免模块导入即崩溃。
+    """
+    global _pool
+    if _pool is None:
+        _pool = _create_pool()
     return _pool.connection()
 
 
