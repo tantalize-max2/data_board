@@ -993,11 +993,12 @@ def admin_rmdir(folder: str, request: Request):
     return {"ok": True}
 
 
+@app.post("/api/admin/info/upload")
 @app.post("/api/admin/info/upload/{folder:path}")
-async def admin_upload(folder: str, request: Request, file: UploadFile = File(...)):
+async def admin_upload(folder: str = "", request: Request = None, file: UploadFile = File(...)):
     """上传文件到指定目录，仅管理员"""
     require_admin(request)
-    dp = _safe_info_path(folder)
+    dp = _safe_info_path(folder) if folder else INFO_DIR
     if not os.path.isdir(dp):
         raise HTTPException(404, "目录不存在")
     fn = os.path.basename(file.filename or "unnamed")
