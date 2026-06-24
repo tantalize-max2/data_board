@@ -724,13 +724,17 @@ def admin_users(request: Request, q: str = "", zone: str = ""):
 @app.post("/api/admin/users")
 async def admin_create_user(request: Request):
     """新增人员"""
-    require_admin(request)
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
     body = await request.json()
     username = (body.get("username") or "").strip()
     role_name = (body.get("role_name") or "").strip()
     zone = (body.get("zone") or "public").strip()
     if not username or not role_name:
         raise HTTPException(400, "登录账号与岗位名必填")
+    # 战区指导只能在所属战区新增人员
+    if zf and zone != zf:
+        raise HTTPException(403, "只能在所属战区新增人员")
     if db.query_one("SELECT id FROM users WHERE username=%s", (username,)):
         raise HTTPException(400, "登录账号已存在")
     wl = warzone_lookup()
@@ -741,24 +745,31 @@ async def admin_create_user(request: Request):
     h = hashlib.sha256((pwd + salt).encode()).hexdigest()
     nid = db.execute(
         "INSERT INTO users(username,name,role_id,role_name,phone,password_hash,password_salt,"
-        "zone,zone_name,color,is_admin) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        "zone,zone_name,color,is_admin,is_zone_admin) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (username, body.get("name") or role_name, username, role_name, body.get("phone", ""),
-         h, salt, zone, w["name"], w["color"], 1 if body.get("is_admin") else 0))
+         h, salt, zone, w["name"], w["color"], 1 if body.get("is_admin") else 0, 0))
     return {"ok": True, "id": nid}
 
 
 @app.put("/api/admin/users/{uid}")
 async def admin_update_user(uid: int, request: Request):
     """编辑人员（支持改密码/电话/姓名/战区/管理员标记）"""
-    require_admin(request)
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
     body = await request.json()
     cur = db.query_one("SELECT * FROM users WHERE id=%s", (uid,))
     if not cur:
         raise HTTPException(404, "人员不存在")
+    # 战区指导只能编辑本战区人员
+    if zf and cur["zone"] != zf:
+        raise HTTPException(403, "只能编辑所属战区的人员")
     name = body.get("name", cur["name"])
     phone = body.get("phone", cur["phone"])
     is_admin = 1 if body.get("is_admin") else 0
     zone = body.get("zone", cur["zone"])
+    # 战区指导不能把人员转到其他战区
+    if zf and zone != zf:
+        raise HTTPException(403, "不能转移到其他战区")
     wl = warzone_lookup()
     w = wl.get(zone)
     zone_name = w["name"] if w else cur["zone_name"]
@@ -780,10 +791,16 @@ async def admin_update_user(uid: int, request: Request):
 @app.delete("/api/admin/users/{uid}")
 async def admin_delete_user(uid: int, request: Request, hard: int = 0):
     """停用人员（软删除，is_active=0）；hard=1 时物理删除"""
-    s = require_admin(request)
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
     me = db.query_one("SELECT id FROM users WHERE username=%s", (s["username"],))
     if str(uid) == str(me["id"]):
         raise HTTPException(400, "不能删除/停用自己")
+    # 战区指导只能删除本战区人员
+    if zf:
+        target = db.query_one("SELECT zone FROM users WHERE id=%s", (uid,))
+        if not target or target.get("zone") != zf:
+            raise HTTPException(403, "只能删除所属战区的人员")
     if hard:
         db.execute("DELETE FROM users WHERE id=%s", (uid,))
     else:

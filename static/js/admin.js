@@ -3,6 +3,16 @@ const TOKEN = new URLSearchParams(location.search).get('token') || sessionStorag
 if(TOKEN) sessionStorage.setItem('admin_token', TOKEN);
 if(!TOKEN){ location.href='/'; }
 
+/* 当前用户信息（启动时加载） */
+let ME=null, IS_ADMIN=false, IS_ZONE_ADMIN=false;
+(async()=>{
+  try{
+    ME=await api('/api/me');
+    IS_ADMIN=!!ME.is_admin;
+    IS_ZONE_ADMIN=!!ME.is_zone_admin;
+  }catch(e){}
+})();
+
 function backToBoard(){
   location.href='/?token='+encodeURIComponent(TOKEN);
 }
@@ -25,7 +35,10 @@ async function api(path, {method='GET', body}={}){
   if(body!==undefined){ opts.headers={'Content-Type':'application/json'}; opts.body=JSON.stringify(body); }
   const res = await fetch(url, opts);
   if(res.status===401){ location.href='/'; throw new Error('未登录'); }
-  if(res.status===403){ toast('需要总经理权限','error'); throw new Error('无权限'); }
+  if(res.status===403){
+    const d=await res.json().catch(()=>({}));
+    toast(d.detail||'无操作权限','error'); throw new Error(d.detail||'无权限');
+  }
   if(!res.ok){ const d=await res.json().catch(()=>({})); throw new Error(d.detail||'请求失败'); }
   return res.json();
 }
