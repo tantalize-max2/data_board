@@ -110,9 +110,28 @@ def require_admin(request: Request) -> dict:
     return s
 
 
+def require_zone_admin(request: Request) -> dict:
+    """总经理或战区指导放行，返回 session（含 zone 限制信息）"""
+    s = require_session(request)
+    if s.get("is_admin"):
+        return s
+    if s.get("is_zone_admin"):
+        return s
+    raise HTTPException(403, "需要管理权限")
+
+
+def get_zone_filter(s: dict) -> Optional[str]:
+    """战区指导返回其 zone，总经理返回 None（不限战区）"""
+    if s.get("is_admin"):
+        return None
+    if s.get("is_zone_admin"):
+        return s.get("zone", "")
+    return None
+
+
 def get_user_info(username: str) -> Optional[dict]:
     row = db.query_one(
-        "SELECT username,name,role_id,role_name,phone,zone,zone_name,color,is_admin "
+        "SELECT username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin "
         "FROM users WHERE username=%s AND is_active=1", (username,))
     if not row:
         return None
@@ -127,6 +146,7 @@ def get_user_info(username: str) -> Optional[dict]:
         "zone_name": row["zone_name"],
         "color": row["color"],
         "is_admin": bool(row["is_admin"]),
+        "is_zone_admin": bool(row.get("is_zone_admin", 0)),
     }
 
 
@@ -155,11 +175,20 @@ def get_accessible_pairs(s: dict) -> List[tuple]:
 
 def get_role_rows(s: dict) -> List[dict]:
     """返回该用户可见的所有实质性记录
-    分局长/客户经理作为战区负责人，自动获得本战区全部数据权限。
+    总经理：全部数据
+    战区指导：本战区全部数据
+    分局长/客户经理：本战区全部数据
+    普通角色：仅 role_access 授权板块
     """
     if s.get("is_admin"):
         sql = "SELECT * FROM deployment_records ORDER BY sort_order, id"
         rows = db.query_all(sql)
+        return [r for r in rows if has_substantive(r)]
+    # 战区指导：本战区全部数据
+    if s.get("is_zone_admin"):
+        rows = db.query_all(
+            "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
+            (s.get("zone", ""),))
         return [r for r in rows if has_substantive(r)]
     # 战区负责人（分局长/客户经理）：本战区全部数据
     me = db.query_one("SELECT zone,role_name FROM users WHERE username=%s AND is_active=1", (s["username"],))
@@ -338,6 +367,8 @@ async def login(request: Request):
         "username": user["username"],
         "role_id": user["role_id"],
         "is_admin": bool(user["is_admin"]),
+        "is_zone_admin": bool(user.get("is_zone_admin", 0)),
+        "zone": user.get("zone", ""),
         "expire": time.time() + TOKEN_TTL,
     })
     return {"token": token, "role": info}
@@ -644,18 +675,24 @@ RECORD_DB_COLS = [f[0] for f in RECORD_FIELDS]
 @app.get("/api/admin/dashboard")
 def admin_dashboard(request: Request):
     """管理首页统计"""
-    require_admin(request)
-    u_total = db.query_one("SELECT COUNT(*) c FROM users WHERE is_active=1")["c"]
-    r_total = db.query_one("SELECT COUNT(*) c FROM deployment_records")["c"]
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
+    u_total = db.query_one("SELECT COUNT(*) c FROM users WHERE is_active=1" + (" AND zone=%s" if zf else ""), (zf,) if zf else ())["c"]
+    r_total = db.query_one("SELECT COUNT(*) c FROM deployment_records" + (" WHERE warzone_id=%s" if zf else ""), (zf,) if zf else ())["c"]
     a_total = db.query_one("SELECT COUNT(*) c FROM role_access")["c"]
     battles = db.query_all("SELECT * FROM battles ORDER BY sort_order")
     warzones = db.query_all("SELECT * FROM warzones ORDER BY sort_order")
     # 各战区人员数
-    zone_users = db.query_all(
-        "SELECT zone, COUNT(*) c FROM users WHERE is_active=1 AND is_admin=0 GROUP BY zone")
+    if zf:
+        zone_users = db.query_all(
+            "SELECT zone, COUNT(*) c FROM users WHERE is_active=1 AND is_admin=0 AND zone=%s GROUP BY zone", (zf,))
+    else:
+        zone_users = db.query_all(
+            "SELECT zone, COUNT(*) c FROM users WHERE is_active=1 AND is_admin=0 GROUP BY zone")
     return {
         "users": u_total, "records": r_total, "access_rules": a_total,
-        "battles": battles, "warzones": warzones,
+        "battles": battles, "warzones": warzones, "is_zone_admin": bool(zf),
+        "zone_name": s.get("zone_name","") if zf else "",
         "zone_users": {r["zone"]: r["c"] for r in zone_users},
     }
 
@@ -664,20 +701,24 @@ def admin_dashboard(request: Request):
 @app.get("/api/admin/users")
 def admin_users(request: Request, q: str = "", zone: str = ""):
     """人员列表（支持关键词 q 与战区过滤）"""
-    require_admin(request)
-    sql = ("SELECT id,username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_active,"
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
+    sql = ("SELECT id,username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,is_active,"
            "created_at FROM users WHERE 1=1")
     args = []
+    # 战区指导只能看本战区人员
+    if zf:
+        sql += " AND zone=%s"; args.append(zf)
     if q:
         sql += " AND (name LIKE %s OR role_name LIKE %s OR phone LIKE %s OR username LIKE %s)"
         kw = f"%{q}%"
         args += [kw, kw, kw, kw]
-    if zone:
+    if zone and not zf:
         sql += " AND zone=%s"
         args.append(zone)
-    sql += " ORDER BY is_admin DESC, zone, role_name"
+    sql += " ORDER BY is_admin DESC, is_zone_admin DESC, zone, role_name"
     rows = db.query_all(sql, args)
-    return {"total": len(rows), "users": rows, "me": get_user_info(require_admin(request)["username"])}
+    return {"total": len(rows), "users": rows, "me": get_user_info(s["username"]), "is_zone_admin": bool(zf)}
 
 
 @app.post("/api/admin/users")
@@ -754,7 +795,8 @@ async def admin_delete_user(uid: int, request: Request, hard: int = 0):
 @app.get("/api/admin/access")
 def admin_get_access(request: Request, role_id: str = ""):
     """查询某角色（或全部）的权限矩阵"""
-    require_admin(request)
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
     battles = db.query_all("SELECT * FROM battles ORDER BY sort_order")
     warzones = db.query_all("SELECT * FROM warzones ORDER BY sort_order")
     if role_id:
@@ -765,24 +807,36 @@ def admin_get_access(request: Request, role_id: str = ""):
     for r in rules:
         if role_id:
             granted.add((r["battle_id"], r["warzone_id"]))
-    # 角色清单（去重）
-    roles = db.query_all(
-        "SELECT DISTINCT role_id,role_name,zone_name FROM users WHERE is_admin=0 ORDER BY zone_name,role_name")
+    # 角色清单（去重）：战区指导只能看本战区角色
+    if zf:
+        roles = db.query_all(
+            "SELECT DISTINCT role_id,role_name,zone_name FROM users WHERE is_admin=0 AND is_zone_admin=0 AND zone=%s ORDER BY role_name",
+            (zf,))
+    else:
+        roles = db.query_all(
+            "SELECT DISTINCT role_id,role_name,zone_name FROM users WHERE is_admin=0 AND is_zone_admin=0 ORDER BY zone_name,role_name")
     return {
         "battles": battles, "warzones": warzones, "roles": roles,
         "granted": [[g[0], g[1]] for g in granted] if role_id else rules,
+        "zone_filter": zf,
     }
 
 
 @app.put("/api/admin/access")
 async def admin_set_access(request: Request):
     """批量设置某角色的可见板块（覆盖式）"""
-    require_admin(request)
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
     body = await request.json()
     role_id = body.get("role_id")
     grants = body.get("grants", [])  # [{battle_id, warzone_id}, ...]
     if not role_id:
         raise HTTPException(400, "role_id 必填")
+    # 战区指导只能修改本战区角色的权限
+    if zf:
+        target = db.query_one("SELECT zone FROM users WHERE role_id=%s AND is_active=1", (role_id,))
+        if not target or target.get("zone") != zf:
+            raise HTTPException(403, "只能分配本战区角色的权限")
     db.execute("DELETE FROM role_access WHERE role_id=%s", (role_id,))
     if grants:
         db.executemany("INSERT IGNORE INTO role_access(role_id,battle_id,warzone_id) VALUES(%s,%s,%s)",
@@ -794,7 +848,7 @@ async def admin_set_access(request: Request):
 @app.get("/api/admin/record-schema")
 def admin_record_schema(request: Request):
     """记录字段定义（前端据此渲染编辑表单）"""
-    require_admin(request)
+    require_zone_admin(request)
     return {"fields": [{"key": k, "label": l, "type": t} for k, l, t in RECORD_FIELDS],
             "battles": db.query_all("SELECT * FROM battles ORDER BY sort_order"),
             "warzones": db.query_all("SELECT * FROM warzones ORDER BY sort_order")}
@@ -803,12 +857,15 @@ def admin_record_schema(request: Request):
 @app.get("/api/admin/records")
 def admin_records(request: Request, battle_id: str = "", zone_id: str = ""):
     """记录列表（支持战役/战区筛选）"""
-    require_admin(request)
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
     sql = "SELECT * FROM deployment_records WHERE 1=1"
     args = []
+    if zf:
+        sql += " AND warzone_id=%s"; args.append(zf)
     if battle_id:
         sql += " AND battle_id=%s"; args.append(battle_id)
-    if zone_id:
+    if zone_id and not zf:
         sql += " AND warzone_id=%s"; args.append(zone_id)
     sql += " ORDER BY battle_id, warzone_id, sort_order, id"
     rows = db.query_all(sql, args)
@@ -818,12 +875,16 @@ def admin_records(request: Request, battle_id: str = "", zone_id: str = ""):
 @app.post("/api/admin/records")
 async def admin_create_record(request: Request):
     """新增记录"""
-    s = require_admin(request)
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
     body = await request.json()
     data = {k: (body.get(k, "") or "") for k in RECORD_DB_COLS}
     bname = (data.get("battle_name") or "").replace("（例）", "").strip()
     zname = (data.get("warzone_name") or "").strip()
     bid = _battle_id(bname); zid = _warzone_id(zname)
+    # 战区指导只能创建本战区记录
+    if zf and zid != zf:
+        raise HTTPException(403, "只能管理本战区的记录")
     max_sort = db.query_one(
         "SELECT COALESCE(MAX(sort_order),0) m FROM deployment_records")["m"]
     nid = db.execute(
@@ -836,14 +897,20 @@ async def admin_create_record(request: Request):
 @app.put("/api/admin/records/{rid}")
 async def admin_update_record(rid: int, request: Request):
     """编辑记录"""
-    s = require_admin(request)
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
     body = await request.json()
-    if not db.query_one("SELECT id FROM deployment_records WHERE id=%s", (rid,)):
+    rec = db.query_one("SELECT id,warzone_id FROM deployment_records WHERE id=%s", (rid,))
+    if not rec:
         raise HTTPException(404, "记录不存在")
+    if zf and rec["warzone_id"] != zf:
+        raise HTTPException(403, "只能管理本战区的记录")
     data = {k: (body.get(k, "") or "") for k in RECORD_DB_COLS}
     bname = (data.get("battle_name") or "").replace("（例）", "").strip()
     zname = (data.get("warzone_name") or "").strip()
     bid = _battle_id(bname); zid = _warzone_id(zname)
+    if zf and zid != zf:
+        raise HTTPException(403, "不能转移到其他战区")
     sets = ", ".join(f"{c}=%s" for c in RECORD_DB_COLS)
     db.execute(
         f"UPDATE deployment_records SET battle_id=%s,warzone_id=%s,{sets},updated_by=%s WHERE id=%s",
@@ -853,7 +920,13 @@ async def admin_update_record(rid: int, request: Request):
 
 @app.delete("/api/admin/records/{rid}")
 async def admin_delete_record(rid: int, request: Request):
-    require_admin(request)
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
+    rec = db.query_one("SELECT id,warzone_id FROM deployment_records WHERE id=%s", (rid,))
+    if not rec:
+        raise HTTPException(404, "记录不存在")
+    if zf and rec["warzone_id"] != zf:
+        raise HTTPException(403, "只能管理本战区的记录")
     db.execute("DELETE FROM deployment_records WHERE id=%s", (rid,))
     return {"ok": True}
 
@@ -987,8 +1060,8 @@ def info_zip_list(filepath: str, request: Request):
 
 @app.post("/api/admin/info/dir/{folder:path}")
 def admin_mkdir(folder: str, request: Request):
-    """创建目录（支持多级），仅管理员"""
-    require_admin(request)
+    """创建目录（支持多级）"""
+    require_zone_admin(request)
     dp = _safe_info_path(folder)
     if os.path.exists(dp):
         raise HTTPException(400, "目录已存在")
@@ -998,8 +1071,8 @@ def admin_mkdir(folder: str, request: Request):
 
 @app.put("/api/admin/info/rename/{folder:path}")
 async def admin_rename(folder: str, request: Request):
-    """重命名目录，仅管理员。body: {"new_name": "新名称"}"""
-    require_admin(request)
+    """重命名目录。body: {"new_name": "新名称"}"""
+    require_zone_admin(request)
     body = await request.json()
     new_name = (body.get("new_name") or "").strip()
     if not new_name or '/' in new_name or '\\' in new_name or '..' in new_name:
@@ -1018,8 +1091,8 @@ async def admin_rename(folder: str, request: Request):
 
 @app.delete("/api/admin/info/dir/{folder:path}")
 def admin_rmdir(folder: str, request: Request):
-    """删除目录（递归删除内容），仅管理员"""
-    require_admin(request)
+    """删除目录（递归删除内容）"""
+    require_zone_admin(request)
     dp = _safe_info_path(folder)
     if not os.path.isdir(dp):
         raise HTTPException(404, "目录不存在")
@@ -1034,7 +1107,7 @@ async def admin_reorder(request: Request):
     """重新排序同级目录。body: {"parent": "父路径", "items": ["raw_name1","raw_name2",...]}
     用数字前缀实现排序，已有前缀的会被覆盖。
     """
-    require_admin(request)
+    require_zone_admin(request)
     body = await request.json()
     parent = (body.get("parent") or "").strip('/')
     items = body.get("items") or []
@@ -1078,8 +1151,8 @@ async def admin_reorder(request: Request):
 @app.post("/api/admin/info/upload")
 @app.post("/api/admin/info/upload/{folder:path}")
 async def admin_upload(folder: str = "", request: Request = None, file: UploadFile = File(...)):
-    """上传文件到指定目录，仅管理员"""
-    require_admin(request)
+    """上传文件到指定目录"""
+    require_zone_admin(request)
     dp = _safe_info_path(folder) if folder else INFO_DIR
     if not os.path.isdir(dp):
         raise HTTPException(404, "目录不存在")
@@ -1097,8 +1170,8 @@ async def admin_upload(folder: str = "", request: Request = None, file: UploadFi
 
 @app.delete("/api/admin/info/file/{filepath:path}")
 def admin_delete_file(filepath: str, request: Request):
-    """删除文件，仅管理员"""
-    require_admin(request)
+    """删除文件"""
+    require_zone_admin(request)
     fp = _safe_info_path(filepath)
     if not os.path.isfile(fp):
         raise HTTPException(404, "文件不存在")

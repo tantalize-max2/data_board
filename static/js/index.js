@@ -83,7 +83,9 @@ async function loadMainPage(){
   document.getElementById('mainZoneBadge').textContent=ROLE.zone_name;
   document.getElementById('mainZoneBadge').style.background=ROLE.color+'44';
   const isAdmin=!!ROLE.is_admin;
-  document.getElementById('btnAdmin').style.display=isAdmin?'inline-block':'none';
+  const isZoneAdmin=!!ROLE.is_zone_admin;
+  const canAdmin=isAdmin||isZoneAdmin;
+  document.getElementById('btnAdmin').style.display=canAdmin?'inline-block':'none';
   document.getElementById('searchSection').style.display=isAdmin?'flex':'none';
   document.getElementById('zoneSection').style.display=isAdmin?'block':'none';
   document.getElementById('troopLabel').textContent=isAdmin?'兵种':'我的战区 · 兵种';
@@ -122,8 +124,9 @@ function renderZoneGrid(zones){
 
 function renderTroopOverview(zones){
   const isAdmin=!!ROLE.is_admin;
-  const isZoneManager=!isAdmin && (ROLE.role_name||'').match(/分局长|客户经理/);
-  const canClick=isAdmin||isZoneManager;
+  const isZoneAdmin=!!ROLE.is_zone_admin;
+  const isZoneManager=!isAdmin && !isZoneAdmin && (ROLE.role_name||'').match(/分局长|客户经理/);
+  const canClick=isAdmin||isZoneManager||isZoneAdmin;
   let h='';zones.forEach(z=>{
     let tags='';(z.roles||[]).forEach(r=>{
       const isMe=r===ROLE.role_name;
@@ -651,7 +654,7 @@ async function loadInfoSections(){
 }
 
 function renderInfoGrid(data){
-  const isAdmin=!!ROLE.is_admin;
+  const isAdmin=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
   let h='';
   (data.dirs||[]).forEach(d=>{
     h+=`<div class="info-card-item" onclick="openInfoBrowser('${esc(d.name)}')">
@@ -681,7 +684,7 @@ function openInfoBrowser(path){
 }
 
 async function loadInfoBrowser(){
-  const isAdmin=!!ROLE.is_admin;
+  const isAdmin=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
   document.getElementById('infoModalTitle').textContent='资料中心';
   document.getElementById('infoModalBody').innerHTML='<div class="loading">加载中...</div>';
   try{
