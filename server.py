@@ -300,6 +300,7 @@ def get_scenes(rows: List[dict], path_no: str) -> List[dict]:
         if not sid:
             continue
         scenes.append({
+            "id": r.get("id"),
             "场景编号": sid,
             "场景名称": r.get("scene_title", ""),
             "场景（对到话术、作战角色）": r.get("scene_name", ""),
@@ -946,6 +947,113 @@ async def admin_delete_record(rid: int, request: Request):
         raise HTTPException(403, "只能管理本战区的记录")
     db.execute("DELETE FROM deployment_records WHERE id=%s", (rid,))
     return {"ok": True}
+
+
+@app.put("/api/admin/records/{rid}/field")
+async def admin_update_field(rid: int, request: Request):
+    """单字段更新记录。body: {"field": "policy", "value": "新内容"}"""
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
+    rec = db.query_one("SELECT id,warzone_id FROM deployment_records WHERE id=%s", (rid,))
+    if not rec:
+        raise HTTPException(404, "记录不存在")
+    if zf and rec["warzone_id"] != zf:
+        raise HTTPException(403, "只能管理本战区的记录")
+    body = await request.json()
+    field = body.get("field", "").strip()
+    value = body.get("value", "")
+    # 白名单校验，防注入
+    allowed_fields = {f[0] for f in RECORD_FIELDS}
+    if field not in allowed_fields:
+        raise HTTPException(400, f"不允许修改字段: {field}")
+    db.execute(f"UPDATE deployment_records SET {field}=%s, updated_by=%s WHERE id=%s",
+               (value, s["username"], rid))
+    return {"ok": True}
+
+
+@app.put("/api/admin/path/update")
+async def admin_update_path(request: Request):
+    """批量更新某路径下所有记录的路径信息。
+    body: {"battle_id":"b1","warzone_id":"public","path_no":"1","path_name":"新名称","path_target":"新目标"}
+    """
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
+    body = await request.json()
+    bid = body.get("battle_id", "")
+    wid = body.get("warzone_id", "")
+    pno = body.get("path_no", "")
+    if zf and wid != zf:
+        raise HTTPException(403, "只能管理本战区的记录")
+    updates = {}
+    if body.get("path_name") is not None:
+        updates["path_name"] = body["path_name"]
+    if body.get("path_target") is not None:
+        updates["path_target"] = body["path_target"]
+    if not updates:
+        raise HTTPException(400, "没有需要更新的字段")
+    sets = ", ".join(f"{k}=%s" for k in updates) + ", updated_by=%s"
+    args = list(updates.values()) + [s["username"]]
+    args.extend([bid, wid, pno])
+    n = db.execute(
+        f"UPDATE deployment_records SET {sets} WHERE battle_id=%s AND warzone_id=%s AND path_no=%s",
+        args)
+    return {"ok": True, "updated": n}
+
+
+@app.get("/api/admin/check-no")
+def admin_check_no(request: Request, bid: str, zid: str, pno: str = "", scene_no: str = ""):
+    """检查路径编号或场景编号是否重复"""
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
+    if zf and zid != zf:
+        raise HTTPException(403, "只能检查本战区")
+    if scene_no:
+        cnt = db.query_one(
+            "SELECT COUNT(*) c FROM deployment_records WHERE battle_id=%s AND warzone_id=%s AND path_no=%s AND scene_no=%s",
+            (bid, zid, pno, scene_no))
+    else:
+        cnt = db.query_one(
+            "SELECT COUNT(*) c FROM deployment_records WHERE battle_id=%s AND warzone_id=%s AND path_no=%s",
+            (bid, zid, pno))
+    return {"duplicate": cnt["c"] > 0, "count": cnt["c"]}
+
+
+@app.get("/api/admin/next-no")
+def admin_next_no(request: Request, bid: str, zid: str, pno: str = ""):
+    """获取下一个可用的路径编号或场景编号"""
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
+    if zf and zid != zf:
+        raise HTTPException(403, "只能操作本战区")
+    if pno:
+        # 查询该路径下最大场景编号
+        rows = db.query_all(
+            "SELECT scene_no FROM deployment_records WHERE battle_id=%s AND warzone_id=%s AND path_no=%s AND scene_no REGEXP '^[0-9]+$'",
+            (bid, zid, pno))
+        max_no = max((int(r["scene_no"]) for r in rows), default=0)
+        return {"next_no": str(max_no + 1)}
+    else:
+        # 查询最大路径编号
+        rows = db.query_all(
+            "SELECT path_no FROM deployment_records WHERE battle_id=%s AND warzone_id=%s AND path_no REGEXP '^[0-9]+$'",
+            (bid, zid))
+        max_no = max((int(r["path_no"]) for r in rows), default=0)
+        return {"next_no": str(max_no + 1)}
+
+
+@app.delete("/api/admin/path/delete")
+async def admin_delete_path(request: Request):
+    """删除整条路径及其下所有场景"""
+    s = require_zone_admin(request)
+    zf = get_zone_filter(s)
+    body = await request.json()
+    bid, wid, pno = body.get("battle_id", ""), body.get("warzone_id", ""), body.get("path_no", "")
+    if zf and wid != zf:
+        raise HTTPException(403, "只能管理本战区的记录")
+    n = db.execute(
+        "DELETE FROM deployment_records WHERE battle_id=%s AND warzone_id=%s AND path_no=%s",
+        (bid, wid, pno))
+    return {"ok": True, "deleted": n}
 
 
 def _battle_id(name: str) -> Optional[str]:

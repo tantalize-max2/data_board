@@ -239,6 +239,7 @@ function renderDetailPage(data){
   }
 
   if(data.paths&&data.paths.length){
+    const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
     h+=`<div class="module-section"><div class="module-title">路径</div><div class="path-grid">`;
     data.paths.forEach(p=>{
       const ck=data.battle.id+'|'+data.zone.id+'|'+p.path_id;
@@ -246,13 +247,104 @@ function renderDetailPage(data){
         <div class="path-name">${esc(p.path_name)}</div>
         <div class="path-target">${p.path_target?esc(p.path_target):'暂无路径目标'}</div>
         <div class="path-meta"><span class="path-id">编号 ${esc(p.path_id)}</span><span class="path-scenes">${p.scene_count}个场景</span></div>
+        ${canEdit?`<div class="path-actions"><button class="path-edit-btn" onclick="event.stopPropagation();editPath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}','${esc(p.path_name)}','${esc(p.path_target||'')}')" onmouseenter="event.stopPropagation();hideHoverPreview()" onmouseleave="event.stopPropagation()">编辑</button><button class="path-del-btn" onclick="event.stopPropagation();deletePath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}','${esc(p.path_name)}')" onmouseenter="event.stopPropagation();hideHoverPreview()" onmouseleave="event.stopPropagation()">删除</button></div>`:''}
         <span class="path-arrow">&#10095;</span></div>`;
     });
-    h+=`</div></div>`;
+    h+=`</div>`;
+    if(canEdit){
+      h+=`<button class="add-path-btn" onclick="addPath('${data.battle.id}','${data.zone.id}','${esc(data.battle.name)}','${esc(data.zone.name)}')">+ 新增路径</button>`;
+    }
+    h+=`</div>`;
   }
 
   if(!h)h='<div class="empty-state">暂无数据</div>';
   el.innerHTML=h;
+}
+
+/* ====== 详情页内联编辑 ====== */
+let EDIT_DETAIL_CACHE=null;
+
+function editPath(bid,zid,pid,pname,ptarget){
+  showConfirm=false;
+  document.getElementById('infoModalTitle').textContent='编辑路径';
+  document.getElementById('infoModalBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">路径名称</label>
+        <input type="text" id="editPathName" class="prompt-input" value="${esc(pname)}"></div>
+      <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">路径目标</label>
+        <textarea id="editPathTarget" class="prompt-input" rows="3" style="height:auto;resize:vertical">${esc(ptarget)}</textarea></div>
+    </div>`;
+  document.getElementById('infoModalBody').innerHTML+=`<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+    <button class="modal-btn modal-btn-no" onclick="closeInfoModal()">取消</button>
+    <button class="modal-btn modal-btn-ok" onclick="savePathEdit('${bid}','${zid}','${esc(pid)}')">保存</button></div>`;
+  document.getElementById('infoModal').classList.add('show');
+}
+
+async function savePathEdit(bid,zid,pid){
+  const pname=document.getElementById('editPathName').value.trim();
+  const ptarget=document.getElementById('editPathTarget').value.trim();
+  try{
+    const res=await fetch('/api/admin/path/update?token='+encodeURIComponent(TOKEN),
+      {method:'PUT',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({battle_id:bid,warzone_id:zid,path_no:pid,path_name:pname,path_target:ptarget})});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'保存失败','error');return;}
+    showToast('保存成功','success');
+    closeInfoModal();
+    openDetail(bid,zid);
+  }catch(e){showToast('网络错误','error');}
+}
+
+/* 新增路径 */
+function addPath(bid,zid,bname,zname){
+  document.getElementById('infoModalTitle').textContent='新增路径';
+  document.getElementById('infoModalBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">路径编号 <span style="color:var(--text-dim)">（自动生成）</span></label>
+        <input type="text" id="addPathNo" class="prompt-input" readonly style="opacity:.7"></div>
+      <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">路径名称</label>
+        <input type="text" id="addPathName" class="prompt-input" placeholder="如：主拆、降档"></div>
+      <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">路径目标</label>
+        <textarea id="addPathTarget" class="prompt-input" rows="3" style="height:auto;resize:vertical" placeholder="如：降档提速"></textarea></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button class="modal-btn modal-btn-no" onclick="closeInfoModal()">取消</button>
+      <button class="modal-btn modal-btn-ok" onclick="saveNewPath('${bid}','${zid}','${esc(bname)}','${esc(zname)}')">创建</button>
+    </div>`;
+  document.getElementById('infoModal').classList.add('show');
+  /* 自动获取下一个编号 */
+  fetch('/api/admin/next-no?bid='+bid+'&zid='+zid+'&token='+encodeURIComponent(TOKEN))
+    .then(r=>r.json()).then(d=>{document.getElementById('addPathNo').value=d.next_no;})
+    .catch(()=>{document.getElementById('addPathNo').value='1';});
+}
+
+async function saveNewPath(bid,zid,bname,zname){
+  const pno=document.getElementById('addPathNo').value.trim();
+  const pname=document.getElementById('addPathName').value.trim();
+  const ptarget=document.getElementById('addPathTarget').value.trim();
+  if(!pname){showToast('请输入路径名称','error');return;}
+  try{
+    const res=await fetch('/api/admin/records?token='+encodeURIComponent(TOKEN),
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({battle_name:bname,warzone_name:zname,path_no:pno,path_name:pname,path_target:ptarget})});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'创建失败','error');return;}
+    showToast('路径创建成功','success');
+    closeInfoModal();
+    openDetail(bid,zid);
+  }catch(e){showToast('网络错误','error');}
+}
+
+/* 删除路径 */
+function deletePath(bid,zid,pid,pname){
+  showConfirm('确定删除路径「'+pname+'」及其下所有场景？此操作不可恢复。',async()=>{
+    try{
+      const res=await fetch('/api/admin/path/delete?token='+encodeURIComponent(TOKEN),
+        {method:'DELETE',headers:{'Content-Type':'application/json'},
+         body:JSON.stringify({battle_id:bid,warzone_id:zid,path_no:pid})});
+      if(!res.ok){const d=await res.json();showToast(d.detail||'删除失败','error');return;}
+      showToast('已删除','success');
+      openDetail(bid,zid);
+    }catch(e){showToast('网络错误','error');}
+  });
 }
 
 /* ====== 路径→场景列表页 ====== */
@@ -294,12 +386,14 @@ function renderPathPage(data){
   h+=`</div></div></div>`;
 
   if(data.scenes&&data.scenes.length){
+    const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
     h+=`<div class="module-section"><div class="module-title">场景</div><div class="scene-grid">`;
     const ck=data.battle.id+'|'+data.zone.id+'|'+(data.path?.path_id||'');
     data.scenes.forEach((s,idx)=>{
       const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名场景';
       const guide=s['指导角色（营销统筹/专员）']||'',combat=s['作战角色']||'';
       const source=s['商机来源']||'',cycle=s['最短管控周期']||'';
+      const delBtn=canEdit&&s.id?`<button class="scene-del-btn" onclick="event.stopPropagation();deleteScene(${s.id},'${ck}','${esc(sceneTitle)}')" onmouseenter="event.stopPropagation();hideHoverPreview()" onmouseleave="event.stopPropagation()">删除</button>`:'';
       h+=`<div class="scene-module" onclick="openScene('${ck}',${idx})" onmouseenter="hoverSceneInfo(event,'${ck}',${idx})" onmouseleave="hideHoverPreview()">
         <div class="sm-header"><span class="sm-id">${esc(s['场景编号']||'')}</span><span class="sm-name">${esc(sceneTitle)}</span></div>
         <div class="sm-fields">
@@ -308,15 +402,71 @@ function renderPathPage(data){
           <div class="sm-field"><span class="sm-flabel">商机来源:</span><span class="sm-fval${source?'':' empty'}">${source?esc(source):'---'}</span></div>
           <div class="sm-field"><span class="sm-flabel">管控周期:</span><span class="sm-fval${cycle?'':' empty'}">${cycle?esc(cycle):'---'}</span></div>
         </div>
+        ${delBtn}
       </div>`;
     });
-    h+=`</div></div>`;
-  }
-
-  if(!data.scenes||!data.scenes.length){
+    h+=`</div>`;
+    if(canEdit){
+      h+=`<button class="add-path-btn" onclick="addScene('${data.battle.id}','${data.zone.id}','${esc(data.path?.path_id||'')}','${esc(data.battle?.name||'')}','${esc(data.zone?.name||'')}','${esc(data.path?.path_name||'')}')">+ 新增场景</button>`;
+    }
+    h+=`</div>`;
+  }else{
+    const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
     h+='<div class="empty-state">该路径暂无场景数据</div>';
+    if(canEdit){
+      h+=`<button class="add-path-btn" onclick="addScene('${data.battle.id}','${data.zone.id}','${esc(data.path?.path_id||'')}','${esc(data.battle?.name||'')}','${esc(data.zone?.name||'')}','${esc(data.path?.path_name||'')}')">+ 新增场景</button>`;
+    }
   }
   el.innerHTML=h;
+}
+
+/* 新增场景 */
+function addScene(bid,zid,pid,bname,zname,pname){
+  document.getElementById('infoModalTitle').textContent='新增场景';
+  document.getElementById('infoModalBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">场景编号 <span style="color:var(--text-dim)">（自动生成）</span></label>
+        <input type="text" id="addSceneNo" class="prompt-input" readonly style="opacity:.7"></div>
+      <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">场景名称</label>
+        <input type="text" id="addSceneName" class="prompt-input" placeholder="如：新装客户首拆"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button class="modal-btn modal-btn-no" onclick="closeInfoModal()">取消</button>
+      <button class="modal-btn modal-btn-ok" onclick="saveNewScene('${bid}','${zid}','${esc(pid)}','${esc(bname)}','${esc(zname)}','${esc(pname)}')">创建</button>
+    </div>`;
+  document.getElementById('infoModal').classList.add('show');
+  /* 自动获取下一个编号 */
+  fetch('/api/admin/next-no?bid='+bid+'&zid='+zid+'&pno='+encodeURIComponent(pid)+'&token='+encodeURIComponent(TOKEN))
+    .then(r=>r.json()).then(d=>{document.getElementById('addSceneNo').value=d.next_no;})
+    .catch(()=>{document.getElementById('addSceneNo').value='1';});
+}
+
+async function saveNewScene(bid,zid,pid,bname,zname,pname){
+  const sno=document.getElementById('addSceneNo').value.trim();
+  const sname=document.getElementById('addSceneName').value.trim();
+  if(!sname){showToast('请输入场景名称','error');return;}
+  try{
+    const res=await fetch('/api/admin/records?token='+encodeURIComponent(TOKEN),
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({battle_name:bname,warzone_name:zname,path_no:pid,path_name:pname,scene_no:sno,scene_title:sname||('场景'+sno),scene_name:sname})});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'创建失败','error');return;}
+    showToast('场景创建成功','success');
+    closeInfoModal();
+    openPath(bid,zid,pid);
+  }catch(e){showToast('网络错误','error');}
+}
+
+/* 删除场景 */
+function deleteScene(rid,ck,sceneTitle){
+  showConfirm('确定删除场景「'+sceneTitle+'」？此操作不可恢复。',async()=>{
+    try{
+      const res=await fetch('/api/admin/records/'+rid+'?token='+encodeURIComponent(TOKEN),{method:'DELETE'});
+      if(!res.ok){const d=await res.json();showToast(d.detail||'删除失败','error');return;}
+      showToast('已删除','success');
+      const parts=ck.split('|');
+      openPath(parts[0],parts[1],parts[2]);
+    }catch(e){showToast('网络错误','error');}
+  });
 }
 
 /* ====== 场景详情页（单元模块） ====== */
@@ -358,6 +508,8 @@ function renderSceneDetail(data,s,sceneTitle){
   const el=document.getElementById('sceneBody');let h='';
   const ck=data.battle.id+'|'+data.zone.id+'|'+(data.path?.path_id||'');
   const sceneIdx=(data.scenes||[]).indexOf(s);
+  const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
+  const recordId=s['id']||s['ID']||'';
 
   h+=`<div class="module-section"><div class="module-title">场景信息</div><div class="info-card"><div class="card-fields">`;
   [['战役',()=>data.battle?.name||'---'],['战区',()=>data.zone?.name||'---'],['路径',()=>data.path?.path_name||'---'],['场景编号',()=>s['场景编号']||'---'],['场景名称',()=>sceneTitle]].forEach(([label,fn])=>{
@@ -366,18 +518,68 @@ function renderSceneDetail(data,s,sceneTitle){
   });
   h+=`</div></div></div>`;
 
-  h+=`<div class="module-section"><div class="module-title">单元信息</div><div class="unit-grid">`;
+  h+=`<div class="module-section"><div class="module-title">单元信息 ${canEdit?'<span style="font-size:11px;font-weight:400;color:var(--text-accent);margin-left:8px">点击单元可直接编辑</span>':''}</div><div class="unit-grid">`;
   UNIT_FIELDS.forEach((u,i)=>{
     const v=(s[u[1]]||'').trim();
     const firstV=firstLine(v);
-    h+=`<div class="unit-module" onclick="openUnit('${ck}',${sceneIdx},${i})" onmouseenter="hoverUnitInfo(event,'${ck}',${sceneIdx},${i})" onmouseleave="hideHoverPreview()">
+    const onclickAttr=canEdit&&recordId?` onclick="editUnitField('${ck}',${sceneIdx},${i},${recordId})"`:` onclick="openUnit('${ck}',${sceneIdx},${i})"`;
+    h+=`<div class="unit-module"${onclickAttr} onmouseenter="hoverUnitInfo(event,'${ck}',${sceneIdx},${i})" onmouseleave="hideHoverPreview()">
       <div class="um-label">${esc(u[0])}</div>
       <div class="um-value${firstV?'':' empty'}">${firstV?esc(firstV):'---'}</div>
+      ${canEdit&&recordId?'<span class="um-edit-icon">&#9998;</span>':''}
       <span class="um-arrow">&#10095;</span>
     </div>`;
   });
   h+=`</div></div>`;
   el.innerHTML=h;
+}
+
+/* 内联编辑单元字段 */
+function editUnitField(ck,sceneIdx,unitIdx,recordId){
+  const data=SCENE_CACHE[ck];
+  if(!data||!data.scenes||!data.scenes[sceneIdx])return;
+  const s=data.scenes[sceneIdx];
+  const fieldDef=UNIT_FIELDS[unitIdx];
+  if(!fieldDef)return;
+  const currentVal=(s[fieldDef[1]]||'').trim();
+  /* DB列名映射 */
+  const dbKeyMap={'指导角色（营销统筹/专员）':'guide_role','作战角色':'combat_role','商机来源':'opportunity_source',
+    '最短管控周期':'control_cycle','最短管控动作（量）':'control_action','最短管控目标（积分/金额）':'control_target',
+    '政策':'policy','激励':'incentive','标准话术':'standard_talk','闭环管控':'closed_loop_control','受理到交付的流程':'process_flow'};
+  const dbKey=dbKeyMap[fieldDef[1]]||fieldDef[1];
+
+  document.getElementById('infoModalTitle').textContent='编辑：'+fieldDef[0];
+  document.getElementById('infoModalBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <label style="font-size:13px;color:var(--text-secondary)">${esc(fieldDef[0])}</label>
+      <textarea id="editUnitValue" class="prompt-input" rows="6" style="height:auto;resize:vertical">${esc(currentVal)}</textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button class="modal-btn modal-btn-no" onclick="closeInfoModal()">取消</button>
+      <button class="modal-btn modal-btn-ok" onclick="saveUnitEdit(${recordId},'${dbKey}')">保存</button>
+    </div>`;
+  document.getElementById('infoModal').classList.add('show');
+  setTimeout(()=>{const ta=document.getElementById('editUnitValue');if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}},100);
+}
+
+async function saveUnitEdit(recordId,dbKey){
+  const value=document.getElementById('editUnitValue').value;
+  try{
+    const res=await fetch('/api/admin/records/'+recordId+'/field?token='+encodeURIComponent(TOKEN),
+      {method:'PUT',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({field:dbKey,value:value})});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'保存失败','error');return;}
+    showToast('保存成功','success');
+    closeInfoModal();
+    /* 刷新当前路径的缓存和数据 */
+    const ck=Object.keys(SCENE_CACHE).find(k=>{
+      const d=SCENE_CACHE[k];return d.scenes&&d.scenes.some(s=>(s.id||s.ID)==recordId);
+    });
+    if(ck){
+      const parts=ck.split('|');
+      openPath(parts[0],parts[1],parts[2]);
+    }
+  }catch(e){showToast('网络错误','error');}
 }
 
 /* ====== 单元信息展示页 ====== */
