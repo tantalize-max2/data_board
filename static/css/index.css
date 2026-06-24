@@ -274,8 +274,10 @@ body>*{position:relative;z-index:1}
   font-size:11px;font-weight:600;font-family:inherit;color:var(--text-accent);
   background:rgba(255,217,128,.12);border:1px solid rgba(255,217,128,.25);transition:all .2s;z-index:2}
 .path-edit-btn:hover{background:rgba(255,217,128,.22)}
-.um-edit-icon{position:absolute;top:8px;right:30px;color:var(--text-accent);font-size:13px;opacity:.5;transition:opacity .2s}
+.um-edit-icon{position:absolute;top:4px;right:28px;color:var(--text-accent);font-size:14px;opacity:.5;transition:opacity .2s;
+  cursor:pointer;padding:6px;z-index:3}
 .unit-module:hover .um-edit-icon{opacity:1}
+.um-edit-icon:hover{opacity:1;background:rgba(255,217,128,.18);border-radius:6px}
 
 .path-actions{position:absolute;top:10px;right:36px;display:flex;gap:6px;z-index:2}
 .path-actions .path-edit-btn{position:static}

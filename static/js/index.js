@@ -518,15 +518,15 @@ function renderSceneDetail(data,s,sceneTitle){
   });
   h+=`</div></div></div>`;
 
-  h+=`<div class="module-section"><div class="module-title">单元信息 ${canEdit?'<span style="font-size:11px;font-weight:400;color:var(--text-accent);margin-left:8px">点击单元可直接编辑</span>':''}</div><div class="unit-grid">`;
+  h+=`<div class="module-section"><div class="module-title">单元信息 ${canEdit?'<span style="font-size:11px;font-weight:400;color:var(--text-accent);margin-left:8px">点击右上角编辑符号可编辑</span>':''}</div><div class="unit-grid">`;
   UNIT_FIELDS.forEach((u,i)=>{
     const v=(s[u[1]]||'').trim();
     const firstV=firstLine(v);
-    const onclickAttr=canEdit&&recordId?` onclick="editUnitField('${ck}',${sceneIdx},${i},${recordId})"`:` onclick="openUnit('${ck}',${sceneIdx},${i})"`;
-    h+=`<div class="unit-module"${onclickAttr} onmouseenter="hoverUnitInfo(event,'${ck}',${sceneIdx},${i})" onmouseleave="hideHoverPreview()">
+    /* 所有人都点击单元进入查看；只有有权限者显示编辑图标 */
+    h+=`<div class="unit-module" onclick="openUnit('${ck}',${sceneIdx},${i})" onmouseenter="hoverUnitInfo(event,'${ck}',${sceneIdx},${i})" onmouseleave="hideHoverPreview()">
       <div class="um-label">${esc(u[0])}</div>
       <div class="um-value${firstV?'':' empty'}">${firstV?esc(firstV):'---'}</div>
-      ${canEdit&&recordId?'<span class="um-edit-icon">&#9998;</span>':''}
+      ${canEdit&&recordId?`<span class="um-edit-icon" onclick="event.stopPropagation();editUnitField('${ck}',${sceneIdx},${i},${recordId})" title="编辑">&#9998;</span>`:''}
       <span class="um-arrow">&#10095;</span>
     </div>`;
   });
