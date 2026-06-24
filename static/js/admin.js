@@ -168,17 +168,20 @@ async function fetchUsers(){
 async function openUserEdit(uid){
   let u=null;
   if(uid){
-    const all=await api('/api/admin/users?q=');
+    const all=await api('/api/admin/users');
     u=all.users.find(x=>x.id===uid);
     if(!u){toast('人员不存在','error');return;}
   }
   const zones=Object.entries(ZONE_LABEL).filter(([k])=>k!=='all');
+  /* 战区指导只能选本战区，锁定下拉框 */
+  const zoneLocked=IS_ZONE_ADMIN&&!IS_ADMIN;
+  const currentZone=zoneLocked?(ME?.zone||''):(u?.zone||'');
   openModal(uid?'编辑人员':'新增人员', `
     <div class="form-grid">
       <div class="form-field"><label>姓名</label><input id="f_name" value="${esc(u?.name||'')}"></div>
       <div class="form-field"><label>岗位名称</label><input id="f_role_name" value="${esc(u?.role_name||'')}"></div>
       <div class="form-field"><label>电话 <span class="hint">（暂未用于登录）</span></label><input id="f_phone" value="${esc(u?.phone||'')}"></div>
-      <div class="form-field"><label>所属战区</label><select id="f_zone">${zones.map(([k,v])=>`<option value="${k}"${u?.zone===k?' selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="form-field"><label>所属战区</label><select id="f_zone" ${zoneLocked?'disabled':''}>${zones.map(([k,v])=>`<option value="${k}"${currentZone===k?' selected':''}>${v}</option>`).join('')}</select></div>
       <div class="form-field"><label>登录账号 <span class="hint">${uid?'留空不修改':'默认同岗位'}</span></label><input id="f_username" value="${esc(u?.username||'')}" ${uid?'':'placeholder="默认同岗位名"'}></div>
       <div class="form-field"><label>密码 <span class="hint">${uid?'留空不修改':'默认 123456'}</span></label><input id="f_password" type="password" placeholder="留空不修改"></div>
       <div class="form-field full"><div class="checkbox-row"><input id="f_admin" type="checkbox" ${u?.is_admin?'checked':''}> <label for="f_admin" style="margin:0">设为总经理（可访问全部数据与管理后台）</label></div></div>
@@ -187,11 +190,12 @@ async function openUserEdit(uid){
 }
 
 async function saveUser(uid){
+  const zoneEl=document.getElementById('f_zone');
   const body={
     name:document.getElementById('f_name').value.trim(),
     role_name:document.getElementById('f_role_name').value.trim(),
     phone:document.getElementById('f_phone').value.trim(),
-    zone:document.getElementById('f_zone').value,
+    zone:zoneEl.value||zoneEl.querySelector('option[selected]')?.value||ME?.zone||'public',
     username:document.getElementById('f_username').value.trim(),
     password:document.getElementById('f_password').value,
     is_admin:document.getElementById('f_admin').checked,
