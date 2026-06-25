@@ -43,14 +43,24 @@ CREATE TABLE IF NOT EXISTS users (
   updated_by VARCHAR(64) DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 角色权限表（额外授权：战役×战区组合）
+-- 角色权限表（角色级授权：角色名 × 战役 × 战区）
 CREATE TABLE IF NOT EXISTS role_access (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  role_id VARCHAR(64) NOT NULL,            -- = users.username（手机号）
+  role_id VARCHAR(64) NOT NULL,            -- = users.role_name（角色名称，如"客户经理"）
   battle_id VARCHAR(32) NOT NULL,
   warzone_id VARCHAR(32) NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_role_bw (role_id, battle_id, warzone_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 用户额外角色表（赋予一个人其它角色，赋予后拥有该角色视角）
+CREATE TABLE IF NOT EXISTS user_extra_roles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(64) NOT NULL,           -- 手机号
+  role_name VARCHAR(64) NOT NULL,          -- 额外角色名称
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_user_role (username, role_name),
+  INDEX idx_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 部署记录表

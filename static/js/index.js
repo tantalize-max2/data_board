@@ -93,6 +93,7 @@ async function loadMainPage(){
     const data=await res.json();
     renderBattleGrid(data.battles);
     if(isAdmin) renderZoneGrid(data.zones);
+    MY_ROLES=data.my_roles||[ROLE.role_name];
     renderTroopOverview(data.zones);
   }catch(e){document.getElementById('mainBattleGrid').innerHTML='<div class="empty-state">加载失败</div>';}
   /* 资料中心独立加载，不受 overview 失败影响，确保所有用户都能看到 */
@@ -120,20 +121,30 @@ function renderZoneGrid(zones){
   });document.getElementById('mainZoneGrid').innerHTML=h;
 }
 
+/* 全局存储用户所有角色，用于兵种高亮 */
+let MY_ROLES=[];
+
 function renderTroopOverview(zones){
   const isAdmin=!!ROLE.is_admin;
   const isZoneAdmin=!!ROLE.is_zone_admin;
-  const isZoneManager=!isAdmin && !isZoneAdmin && (ROLE.role_name||'').match(/分局长|客户经理/);
-  const canClick=isAdmin||isZoneManager||isZoneAdmin;
-  let h='';zones.forEach(z=>{
-    let tags='';(z.roles||[]).forEach(r=>{
-      const isMe=r===ROLE.role_name;
-      const cls='tz-tag'+(isMe?' is-me':'')+(canClick?' clickable':'');
-      const click=canClick?` onclick="showRoleBattles('${esc(r)}')"`:'';
-      const title=canClick?('点击查看'+esc(r)+'的战役信息'):'';
+  const myZone=ROLE.zone;
+  let h='';
+  zones.forEach(z=>{
+    let tags='';
+    (z.roles||[]).forEach(r=>{
+      /* 只有自己战区中的角色才可能高亮，其它战区同角色名不高亮 */
+      const isMyZone=z.id===myZone;
+      const isMe=isMyZone&&MY_ROLES.includes(r);
+      /* 管理员/战区管理员可点击所有；普通用户只能点击自己的角色 */
+      const canClickThis=isAdmin||isZoneAdmin||isMe;
+      const cls='tz-tag'+(isMe?' is-me':'')+(canClickThis?' clickable':'');
+      const click=canClickThis?` onclick="showRoleBattles('${esc(r)}')"`:'';
+      const title=canClickThis?('点击查看'+esc(r)+'的战役信息'):'无权限';
       tags+=`<span class="${cls}"${click} title="${title}">${esc(r)}</span>`;
-    });h+=`<div class="troop-zone-group"><div class="tz-name" style="color:${mapBattleColor(z.color)}">${esc(z.name)}</div><div class="tz-roles">${tags}</div></div>`;
-  });document.getElementById('mainTroopZones').innerHTML=h;
+    });
+    h+=`<div class="troop-zone-group"><div class="tz-name" style="color:${mapBattleColor(z.color)}">${esc(z.name)}</div><div class="tz-roles">${tags}</div></div>`;
+  });
+  document.getElementById('mainTroopZones').innerHTML=h;
 }
 
 /* ====== 战役→战区选择 ====== */
@@ -1230,7 +1241,7 @@ async function doChangePwd(){
   }catch(e){showToast('网络错误','error');}
 }
 
-/* ====== 水印 ====== */
+/* ====== 水印（10个从左下到右上平均分配） ====== */
 function updateWatermark(){
   const layer=document.getElementById('watermarkLayer');
   if(!layer)return;
@@ -1238,11 +1249,14 @@ function updateWatermark(){
   /* 主界面不显示水印 */
   const activePage=document.querySelector('.page.active');
   if(activePage&&activePage.id==='pageMain'){layer.innerHTML='';layer.style.display='none';return;}
-  /* 其他界面显示水印：姓名_电话 */
+  /* 其他界面显示水印：姓名_电话，10个斜向排列 */
   const text=ROLE.name+'_'+(ROLE.phone||ROLE.username||'');
   let h='';
-  for(let i=0;i<40;i++){
-    h+='<div class="wm-item">'+esc(text)+'</div>';
+  for(let i=0;i<10;i++){
+    /* 从左下(5%,90%)到右上(95%,10%)均匀分布 */
+    const xPct=5+(90*i/9);
+    const yPct=90-(80*i/9);
+    h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%">${esc(text)}</div>`;
   }
   layer.innerHTML=h;
   layer.style.display='block';

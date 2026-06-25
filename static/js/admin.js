@@ -154,7 +154,8 @@ async function fetchUsers(){
               <td>${u.is_active?'<span class="tag tag-active">在用</span>':'<span class="tag tag-stopped">停用</span>'}</td>
               <td>
                 <button class="btn btn-ghost btn-sm" onclick="openUserEdit(${u.id})">编辑</button>
-                ${u.is_active?`<button class="btn btn-danger btn-sm" onclick="stopUser(${u.id},'${esc(u.name)}')">停用</button>`:''}
+                ${u.is_active?`<button class="btn btn-danger btn-sm" onclick="stopUser(${u.id},'${esc(u.name)}')">停用</button>`:`<button class="btn btn-primary btn-sm" onclick="activateUser(${u.id},'${esc(u.name)}')">启用</button>`}
+                <button class="btn btn-ghost btn-sm" onclick="openUserRoles(${u.id})" title="赋予额外角色">角色</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${esc(u.name)}')">删除</button>
               </td>
             </tr>`).join('')}
@@ -217,6 +218,40 @@ async function stopUser(uid,name){
   catch(e){toast(e.message,'error');}
 }
 
+async function activateUser(uid,name){
+  if(!confirm('确认启用「'+name+'」？'))return;
+  try{ await api('/api/admin/users/'+uid+'/activate',{method:'PUT'}); toast('已启用','success'); fetchUsers(); }
+  catch(e){toast(e.message,'error');}
+}
+
+/* 赋予额外角色 */
+async function openUserRoles(uid){
+  try{
+    const d=await api('/api/admin/user-roles/'+uid);
+    const allRoles=d.all_roles||[];
+    const extraSet=new Set(d.extra_roles||[]);
+    openModal('赋予角色 · '+d.name+'（主角色：'+d.primary_role+'）',`
+      <div style="margin-bottom:10px;font-size:13px;color:var(--text-dim)">勾选需要赋予的额外角色，赋予后该用户将拥有这些角色的数据视角：</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:300px;overflow-y:auto">
+        ${allRoles.map(r=>{
+          if(r===d.primary_role)return '';
+          const checked=extraSet.has(r)?'checked':'';
+          return `<label style="display:flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px">
+            <input type="checkbox" class="role-cb" value="${esc(r)}" ${checked}> ${esc(r)}</label>`;
+        }).join('')}
+      </div>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveUserRoles(${uid})">保存</button>`);
+  }catch(e){toast(e.message,'error');}
+}
+
+async function saveUserRoles(uid){
+  const roles=[...document.querySelectorAll('.role-cb:checked')].map(cb=>cb.value);
+  try{
+    await api('/api/admin/user-roles/'+uid,{method:'PUT',body:{roles}});
+    toast('角色已更新','success'); closeModal();
+  }catch(e){toast(e.message,'error');}
+}
+
 async function deleteUser(uid,name){
   if(!confirm('确认删除「'+name+'」？\n\n⚠️ 此操作不可恢复，将永久删除该人员所有数据！'))return;
   try{ await api('/api/admin/users/'+uid+'?hard=1',{method:'DELETE'}); toast('已删除','success'); fetchUsers(); }
@@ -232,17 +267,28 @@ async function loadAccess(){
   try{
     const data=await api('/api/admin/access');
     ACCESS_STATE.battles=data.battles; ACCESS_STATE.warzones=data.warzones; ACCESS_STATE.roles=data.roles;
+    ACCESS_STATE.all_roles=data.roles;
     el.innerHTML=`
-      <div class="panel-title">权限分配</div>
-      <div class="toolbar">
+      <div class="panel-title">角色权限分配</div>
+      <div class="toolbar" style="gap:10px">
         <div class="search-box"><select id="accessRole" onchange="selectRole(this.value)">
-          <option value="">— 选择岗位 —</option>
-          ${data.roles.map(r=>`<option value="${esc(r.role_id)}">${esc(r.role_name)}（${esc(r.zone_name)}）</option>`).join('')}
+          <option value="">— 选择角色 —</option>
+          ${data.roles.map(r=>`<option value="${esc(r.role_id)}">${esc(r.role_name)}</option>`).join('')}
         </select></div>
+        <div class="search-box" style="flex:1">
+          <input type="text" id="accessSearch" placeholder="搜索角色..." oninput="filterRoles(this.value)" style="width:100%;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:6px;color:#fff;padding:6px 12px;font-size:13px">
+        </div>
       </div>
-      <div id="accessBox" style="margin-top:12px"><div class="empty">请先选择一个岗位</div></div>`;
+      <div id="accessBox" style="margin-top:12px"><div class="empty">请先选择一个角色</div></div>`;
     if(ACCESS_STATE.role_id){ document.getElementById('accessRole').value=ACCESS_STATE.role_id; selectRole(ACCESS_STATE.role_id); }
   }catch(e){ el.innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
+}
+
+function filterRoles(q){
+  const sel=document.getElementById('accessRole');
+  const filtered=ACCESS_STATE.all_roles.filter(r=>!q||r.role_name.toLowerCase().includes(q.toLowerCase()));
+  sel.innerHTML='<option value="">— 选择角色 —</option>'+filtered.map(r=>`<option value="${esc(r.role_id)}">${esc(r.role_name)}</option>`).join('');
+  if(ACCESS_STATE.role_id) sel.value=ACCESS_STATE.role_id;
 }
 
 async function selectRole(roleId){
