@@ -60,6 +60,21 @@
   </div>
 </div>
 
+<!-- 输入弹窗 -->
+<div class="modal-mask" id="promptMask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center">
+  <div style="background:var(--bg-card,#1a2332);border:1px solid var(--border-hover,#2a3f5c);border-radius:12px;padding:0;width:360px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+    <div style="padding:18px 22px;font-size:16px;font-weight:700;color:#fff;border-bottom:1px solid var(--border-hover,#2a3f5c)" id="promptTitle">请输入</div>
+    <div style="padding:22px;font-size:14px;color:var(--text-secondary,#a0b4cc);line-height:1.6" id="promptMsg"></div>
+    <div style="padding:0 22px 18px">
+      <input type="text" id="promptInput" style="width:100%;background:rgba(0,0,0,.25);border:1px solid var(--border-hover,#2a3f5c);border-radius:6px;color:#fff;padding:10px 14px;font-size:14px;outline:none" onkeydown="if(event.key==='Enter')execAdminPrompt()">
+    </div>
+    <div style="padding:0 22px 18px;display:flex;gap:10px;justify-content:flex-end">
+      <button style="padding:8px 22px;border-radius:6px;border:1px solid var(--border-hover,#2a3f5c);background:transparent;color:var(--text-secondary,#a0b4cc);cursor:pointer;font-size:13px" onclick="closeAdminPrompt()">取消</button>
+      <button style="padding:8px 22px;border-radius:6px;border:none;background:linear-gradient(135deg,#2196f3,#1565c0);color:#fff;cursor:pointer;font-size:13px;font-weight:600" onclick="execAdminPrompt()">确认</button>
+    </div>
+  </div>
+</div>
+
 <!-- 水印层 -->
 <div class="watermark-layer" id="watermarkLayer"></div>
 

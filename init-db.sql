@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
   is_admin TINYINT DEFAULT 0,              -- 全局管理员
   is_zone_admin TINYINT DEFAULT 0,         -- 战区管理员（分局长）
   is_active TINYINT DEFAULT 1,
+  is_placeholder TINYINT DEFAULT 0,        -- 1=占位人员（岗位管理创建的，非真实用户）
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) DEFAULT ''

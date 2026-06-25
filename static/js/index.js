@@ -132,6 +132,7 @@ function renderTroopOverview(zones){
   zones.forEach(z=>{
     let tags='';
     (z.roles||[]).forEach(r=>{
+      if(!r||!r.trim())return;  /* 过滤空白兵种 */
       /* 只有自己战区中的角色才可能高亮，其它战区同角色名不高亮 */
       const isMyZone=z.id===myZone;
       const isMe=isMyZone&&MY_ROLES.includes(r);
@@ -1250,13 +1251,16 @@ function updateWatermark(){
   /* 主界面不显示水印 */
   const activePage=document.querySelector('.page.active');
   if(activePage&&activePage.id==='pageMain'){layer.innerHTML='';layer.style.display='none';return;}
-  /* 其他界面显示水印：姓名_电话，15个从左下到右上均匀分配 */
+  /* 其他界面显示水印：姓名_电话，网格状均匀分布全屏(5列×3行) */
   const text=ROLE.name+'_'+(ROLE.phone||ROLE.username||'');
+  const cols=5,rows=3;
   let h='';
-  for(let i=0;i<15;i++){
-    const xPct=5+(90*i/14);
-    const yPct=92-(84*i/14);
-    h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%">${esc(text)}</div>`;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const xPct=8+(84*c/(cols-1));
+      const yPct=10+(80*r/(rows-1));
+      h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%">${esc(text)}</div>`;
+    }
   }
   layer.innerHTML=h;
   layer.style.display='block';

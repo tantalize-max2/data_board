@@ -19,11 +19,14 @@ function initAdminWatermark(){
   const layer=document.getElementById('watermarkLayer');
   if(!layer||!ME||!ME.name)return;
   const text=ME.name+'_'+(ME.phone||ME.username||'');
+  const cols=5,rows=3;
   let h='';
-  for(let i=0;i<15;i++){
-    const xPct=5+(90*i/14);
-    const yPct=92-(84*i/14);
-    h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%">${esc(text)}</div>`;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const xPct=8+(84*c/(cols-1));
+      const yPct=10+(80*r/(rows-1));
+      h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%">${esc(text)}</div>`;
+    }
   }
   layer.innerHTML=h;
   layer.style.display='block';
@@ -42,8 +45,32 @@ function closeAdminConfirm(){
   _adminConfirmCb=null;
 }
 function execAdminConfirm(){
-  closeAdminConfirm();
-  if(_adminConfirmCb){const cb=_adminConfirmCb;_adminConfirmCb=null;cb();}
+  const cb=_adminConfirmCb;
+  document.getElementById('confirmMask').style.display='none';
+  _adminConfirmCb=null;
+  if(cb)cb();
+}
+
+/* 自定义输入弹窗（替代原生prompt） */
+let _adminPromptCb=null;
+function showAdminPrompt(title,msg,defaultVal,cb){
+  document.getElementById('promptTitle').textContent=title;
+  document.getElementById('promptMsg').textContent=msg||'';
+  const inp=document.getElementById('promptInput');
+  inp.value=defaultVal||'';
+  _adminPromptCb=cb;
+  document.getElementById('promptMask').style.display='flex';
+  setTimeout(()=>inp.focus(),50);
+}
+function closeAdminPrompt(){
+  document.getElementById('promptMask').style.display='none';
+  _adminPromptCb=null;
+}
+function execAdminPrompt(){
+  const val=document.getElementById('promptInput').value.trim();
+  const cb=_adminPromptCb;
+  closeAdminPrompt();
+  if(cb)cb(val);
 }
 
 function backToBoard(){
@@ -157,11 +184,71 @@ async function loadUsers(){
       </select>
       <button class="btn btn-primary" onclick="fetchUsers()">搜索</button>
       <button class="btn btn-ghost" onclick="openUserEdit(null)">+ 新增人员</button>
+      <button class="btn btn-ghost" onclick="openPositionManager()">岗位管理</button>
     </div>
     <div id="usersTable"><div class="loading">加载中...</div></div>`;
   document.getElementById('userQ').addEventListener('keydown',e=>{if(e.key==='Enter')fetchUsers();});
   document.getElementById('userZone').addEventListener('change',()=>{USERS_STATE.zone=document.getElementById('userZone').value;fetchUsers();});
   fetchUsers();
+}
+
+/* ====== 岗位管理 ====== */
+async function openPositionManager(){
+  try{
+    const data=await api('/api/admin/positions');
+    const grouped=data.grouped||[];
+    let bodyHtml='<div style="margin-bottom:10px;font-size:13px;color:var(--text-dim)">管理各战区下的岗位，可新增、编辑、删除岗位名称。删除岗位后该岗位下的人员将被清空角色名。</div>';
+    grouped.forEach(g=>{
+      bodyHtml+=`<div style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border-hover)">
+          <span style="font-size:13px;font-weight:700;color:var(--cyan)">${esc(g.zone_name)}</span>
+          <button class="btn btn-primary btn-sm" style="font-size:11px;padding:4px 12px" onclick="addPosition('${esc(g.zone)}','${esc(g.zone_name)}')">+ 新增岗位</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">`;
+      (g.positions||[]).forEach(p=>{
+        bodyHtml+=`<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:rgba(0,0,0,.15)">
+          <span>${esc(p.role_name)}</span>
+          <span style="font-size:10px;color:var(--text-dim)">${p.count}人</span>
+          <button style="background:none;border:none;color:var(--cyan);cursor:pointer;font-size:12px;padding:0 4px" onclick="editPosition('${esc(g.zone)}','${esc(p.role_name)}')" title="编辑">&#9998;</button>
+          <button style="background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:12px;padding:0 4px" onclick="deletePosition('${esc(g.zone)}','${esc(p.role_name)}',${p.count})" title="删除">&times;</button>
+        </div>`;
+      });
+      bodyHtml+='</div></div>';
+    });
+    openModal('岗位管理',bodyHtml,`<button class="btn btn-ghost" onclick="closeModal()">关闭</button>`);
+  }catch(e){toast(e.message,'error');}
+}
+
+async function addPosition(zone,zoneName){
+  showAdminPrompt('新增岗位','请输入岗位名称：','',async(name)=>{
+    if(!name)return;
+    try{
+      await api('/api/admin/positions',{method:'POST',body:{zone,role_name:name}});
+      toast('岗位已新增','success'); openPositionManager();
+    }catch(e){toast(e.message,'error');}
+  });
+}
+
+async function editPosition(zone,oldName){
+  showAdminPrompt('编辑岗位','请输入新的岗位名称：',oldName,async(newName)=>{
+    if(!newName||newName===oldName)return;
+    try{
+      await api('/api/admin/positions',{method:'PUT',body:{zone,old_name:oldName,new_name:newName}});
+      toast('岗位已更新','success'); openPositionManager();
+    }catch(e){toast(e.message,'error');}
+  });
+}
+
+async function deletePosition(zone,roleName,count){
+  if(count>0){
+    showConfirm('岗位「'+roleName+'」下还有'+count+'人，删除后这些人员的角色名将被清空。确认删除？',async()=>{
+      try{await api('/api/admin/positions?zone='+encodeURIComponent(zone)+'&role_name='+encodeURIComponent(roleName),{method:'DELETE'});toast('岗位已删除','success');openPositionManager();}
+      catch(e){toast(e.message,'error');}
+    });
+  }else{
+    try{await api('/api/admin/positions?zone='+encodeURIComponent(zone)+'&role_name='+encodeURIComponent(roleName),{method:'DELETE'});toast('岗位已删除','success');openPositionManager();}
+    catch(e){toast(e.message,'error');}
+  }
 }
 
 async function fetchUsers(){
@@ -206,21 +293,45 @@ async function openUserEdit(uid){
     if(!u){toast('人员不存在','error');return;}
   }
   const zones=Object.entries(ZONE_LABEL).filter(([k])=>k!=='all');
-  /* 战区指导只能选本战区，锁定下拉框 */
   const zoneLocked=IS_ZONE_ADMIN&&!IS_ADMIN;
-  const canSetPrivilege=IS_ADMIN;  /* 只有全局管理员能设置总经理/战区管理员 */
-  const currentZone=zoneLocked?(ME?.zone||''):(u?.zone||'');
+  const canSetPrivilege=IS_ADMIN;
+  const currentZone=zoneLocked?(ME?.zone||''):(u?.zone||'business');
+  /* 获取本战区岗位列表 */
+  let positions=[];
+  try{
+    const posData=await api('/api/admin/positions');
+    const zg=(posData.grouped||[]).find(g=>g.zone===currentZone);
+    if(zg)positions=zg.positions.map(p=>p.role_name);
+  }catch(e){}
+  const roleOpts=positions.length?positions:[u?.role_name||''].filter(Boolean);
   openModal(uid?'编辑人员':'新增人员', `
     <div class="form-grid">
       <div class="form-field"><label>姓名</label><input id="f_name" value="${esc(u?.name||'')}"></div>
-      <div class="form-field"><label>岗位名称</label><input id="f_role_name" value="${esc(u?.role_name||'')}"></div>
+      <div class="form-field"><label>岗位名称</label>
+        <select id="f_role_name" style="width:100%;background:rgba(0,0,0,.25);border:1px solid var(--border-hover);border-radius:6px;color:#fff;padding:8px 12px;font-size:14px">
+          ${roleOpts.map(r=>`<option value="${esc(r)}" ${r===(u?.role_name||'')?'selected':''}>${esc(r)}</option>`).join('')}
+        </select></div>
       <div class="form-field"><label>手机号 <span class="hint">（用于登录）</span></label><input id="f_phone" value="${esc(u?.phone||u?.username||'')}" placeholder="请输入手机号"></div>
-      <div class="form-field"><label>所属战区</label><select id="f_zone" ${zoneLocked?'disabled':''}>${zones.map(([k,v])=>`<option value="${k}"${currentZone===k?' selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="form-field"><label>所属战区</label><select id="f_zone" onchange="onUserZoneChange(this.value)" ${zoneLocked?'disabled':''}>${zones.map(([k,v])=>`<option value="${k}"${currentZone===k?' selected':''}>${v}</option>`).join('')}</select></div>
       <div class="form-field"><label>密码 <span class="hint">${uid?'留空不修改':'默认 Xs@2026'}</span></label><input id="f_password" type="password" placeholder="留空不修改"></div>
       ${canSetPrivilege?`<div class="form-field"><label>战区管理员</label><div class="checkbox-row"><input id="f_zone_admin" type="checkbox" ${u?.is_zone_admin?'checked':''}> <label for="f_zone_admin" style="margin:0">设为战区管理员（可管理本战区人员与内容）</label></div></div>`:''}
       ${canSetPrivilege?`<div class="form-field full"><div class="checkbox-row"><input id="f_admin" type="checkbox" ${u?.is_admin?'checked':''}> <label for="f_admin" style="margin:0">设为总经理（可访问全部数据与管理后台）</label></div></div>`:''}
     </div>`,
     `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveUser(${uid||0})">保存</button>`);
+}
+
+/* 切换战区时刷新岗位下拉 */
+async function onUserZoneChange(zone){
+  let positions=[];
+  try{
+    const posData=await api('/api/admin/positions');
+    const zg=(posData.grouped||[]).find(g=>g.zone===zone);
+    if(zg)positions=zg.positions.map(p=>p.role_name);
+  }catch(e){}
+  const sel=document.getElementById('f_role_name');
+  if(sel){
+    sel.innerHTML=positions.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
+  }
 }
 
 async function saveUser(uid){
@@ -301,7 +412,19 @@ async function saveUserRoles(uid){
 }
 
 /* ====== 权限分配 ====== */
-let ACCESS_STATE={role_id:'',battles:[],warzones:[],granted:new Set(),roles:[]};
+let ACCESS_STATE={role_id:'',battles:[],warzones:[],granted:new Set(),roles:[],roles_grouped:[]};
+
+function buildRoleSelect(grouped,q){
+  let opts='<option value="">— 选择角色 —</option>';
+  grouped.forEach(g=>{
+    const filtered=q?g.roles.filter(r=>r.toLowerCase().includes(q.toLowerCase())):g.roles;
+    if(!filtered.length)return;
+    opts+=`<optgroup label="${esc(g.zone_name)}">`;
+    filtered.forEach(r=>{opts+=`<option value="${esc(r)}">${esc(r)}</option>`;});
+    opts+='</optgroup>';
+  });
+  return opts;
+}
 
 async function loadAccess(){
   const el=document.getElementById('tab-access');
@@ -309,13 +432,12 @@ async function loadAccess(){
   try{
     const data=await api('/api/admin/access');
     ACCESS_STATE.battles=data.battles; ACCESS_STATE.warzones=data.warzones; ACCESS_STATE.roles=data.roles;
-    ACCESS_STATE.all_roles=data.roles;
+    ACCESS_STATE.all_roles=data.roles; ACCESS_STATE.roles_grouped=data.roles_grouped||[];
     el.innerHTML=`
       <div class="panel-title">角色权限分配</div>
       <div class="toolbar" style="gap:10px">
         <div class="search-box"><select id="accessRole" onchange="selectRole(this.value)">
-          <option value="">— 选择角色 —</option>
-          ${data.roles.map(r=>`<option value="${esc(r.role_id)}">${esc(r.role_name)}</option>`).join('')}
+          ${buildRoleSelect(ACCESS_STATE.roles_grouped,'')}
         </select></div>
         <div class="search-box" style="flex:1">
           <input type="text" id="accessSearch" placeholder="搜索角色..." oninput="filterRoles(this.value)" style="width:100%;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:6px;color:#fff;padding:6px 12px;font-size:13px">
@@ -328,8 +450,7 @@ async function loadAccess(){
 
 function filterRoles(q){
   const sel=document.getElementById('accessRole');
-  const filtered=ACCESS_STATE.all_roles.filter(r=>!q||r.role_name.toLowerCase().includes(q.toLowerCase()));
-  sel.innerHTML='<option value="">— 选择角色 —</option>'+filtered.map(r=>`<option value="${esc(r.role_id)}">${esc(r.role_name)}</option>`).join('');
+  sel.innerHTML=buildRoleSelect(ACCESS_STATE.roles_grouped,q);
   if(ACCESS_STATE.role_id) sel.value=ACCESS_STATE.role_id;
 }
 
