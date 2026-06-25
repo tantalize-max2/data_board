@@ -891,7 +891,7 @@ def admin_users(request: Request, q: str = "", zone: str = ""):
     """人员列表（支持关键词 q 与战区过滤）"""
     s = require_zone_admin(request)
     zf = get_zone_filter(s)
-    sql = ("SELECT id,username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,is_active,must_change_pwd,"
+    sql = ("SELECT id,username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,is_guide,is_active,must_change_pwd,"
            "created_at FROM users WHERE 1=1")
     args = []
     # 战区指导只能看本战区人员
