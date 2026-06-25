@@ -11,7 +11,7 @@
 API 兼容：原有 6 个业务接口签名不变，前端无需改动调用方式。
 新增：/api/roles, /api/admin/* 一组管理接口。
 """
-import os, hashlib, time, hmac, base64, json, secrets, threading, shutil, urllib.parse
+import os, hashlib, time, hmac, base64, json, secrets, threading, shutil, urllib.parse, re
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Request, HTTPException, Query, UploadFile, File
 from fastapi.responses import HTMLResponse, FileResponse, Response
@@ -23,6 +23,17 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 app = FastAPI(title="夏收行动部署看板")
+
+# 静态文件禁缓存中间件（开发环境避免浏览器缓存 JS/CSS）
+@app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 # ====== 签名 Token（无状态，多 worker 共享）======
@@ -131,7 +142,7 @@ def get_zone_filter(s: dict) -> Optional[str]:
 
 def get_user_info(username: str) -> Optional[dict]:
     row = db.query_one(
-        "SELECT username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin "
+        "SELECT username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,must_change_pwd "
         "FROM users WHERE username=%s AND is_active=1", (username,))
     if not row:
         return None
@@ -147,7 +158,80 @@ def get_user_info(username: str) -> Optional[dict]:
         "color": row["color"],
         "is_admin": bool(row["is_admin"]),
         "is_zone_admin": bool(row.get("is_zone_admin", 0)),
+        "must_change_pwd": bool(row.get("must_change_pwd", 0)),
     }
+
+
+# ====== 强密码校验 ======
+def validate_strong_password(pwd: str) -> Optional[str]:
+    """校验强密码：>=8位，含大小写字母+数字+特殊符号。返回 None=通过，否则返回错误描述"""
+    if len(pwd) < 8:
+        return "密码至少8位"
+    if not re.search(r'[A-Z]', pwd):
+        return "密码需包含大写字母"
+    if not re.search(r'[a-z]', pwd):
+        return "密码需包含小写字母"
+    if not re.search(r'[0-9]', pwd):
+        return "密码需包含数字"
+    if not re.search(r'[!@#$%^&*()_+\-=\[\]{};:\'",.<>?/\\|`~]', pwd):
+        return "密码需包含特殊符号(!@#$%^&*等)"
+    return None
+
+
+# ====== 作战角色正则匹配 ======
+def match_combat_role(user_role_name: str, combat_role: str) -> bool:
+    """判断用户的角色名是否包含在作战角色字段中。
+    combat_role 格式可能为 'A'、'A+B+C'、'A、B、C' 等。
+    匹配策略：按 + 或 、 分割后，用户角色精确匹配或被包含。
+    """
+    if not user_role_name or not combat_role:
+        return False
+    # 按 + 或 、 分割，去除空白
+    parts = re.split(r'[+、，,]', combat_role)
+    parts = [p.strip() for p in parts if p.strip()]
+    # 精确匹配
+    if user_role_name in parts:
+        return True
+    # 模糊匹配：用户角色名是某个 part 的子串，或反过来
+    for p in parts:
+        if user_role_name in p or p in user_role_name:
+            return True
+    return False
+
+
+# ====== 日志辅助 ======
+def _get_client_ip(request: Request) -> str:
+    fwd = request.headers.get("X-Forwarded-For", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
+def log_login(username: str, name: str, role_name: str, request: Request,
+              success: bool, fail_reason: str = ""):
+    """写入登录日志"""
+    try:
+        db.execute(
+            "INSERT INTO login_logs(username,name,role_name,ip,user_agent,success,fail_reason) "
+            "VALUES(%s,%s,%s,%s,%s,%s,%s)",
+            (username, name, role_name, _get_client_ip(request),
+             request.headers.get("User-Agent", "")[:256],
+             1 if success else 0, fail_reason))
+    except Exception:
+        pass
+
+
+def log_access(operator: str, operator_name: str, action: str,
+               target_type: str, target_id: str, detail: str, request: Request):
+    """写入权限操作日志"""
+    try:
+        db.execute(
+            "INSERT INTO access_logs(operator,operator_name,action,target_type,target_id,detail,ip) "
+            "VALUES(%s,%s,%s,%s,%s,%s,%s)",
+            (operator, operator_name, action, target_type, target_id, detail,
+             _get_client_ip(request)))
+    except Exception:
+        pass
 
 
 # ====== 业务辅助 ======
@@ -175,39 +259,53 @@ def get_accessible_pairs(s: dict) -> List[tuple]:
 
 def get_role_rows(s: dict) -> List[dict]:
     """返回该用户可见的所有实质性记录
-    总经理：全部数据
-    战区指导：本战区全部数据
-    分局长/客户经理：本战区全部数据
-    普通角色：仅 role_access 授权板块
+    权限层级：
+      1. 管理员(is_admin)：全部数据
+      2. 战区管理员(is_zone_admin)：本战区全部数据
+      3. 普通人员：作战角色(combat_role)包含自己角色的场景 + role_access额外授权
     """
     if s.get("is_admin"):
         sql = "SELECT * FROM deployment_records ORDER BY sort_order, id"
         rows = db.query_all(sql)
         return [r for r in rows if has_substantive(r)]
-    # 战区指导：本战区全部数据
+    # 战区管理员：本战区全部数据
     if s.get("is_zone_admin"):
         rows = db.query_all(
             "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
             (s.get("zone", ""),))
         return [r for r in rows if has_substantive(r)]
-    # 战区负责人（分局长/客户经理）：本战区全部数据
+    # 普通人员：查自己的角色名
     me = db.query_one("SELECT zone,role_name FROM users WHERE username=%s AND is_active=1", (s["username"],))
-    if me and ("分局长" in (me["role_name"] or "") or "客户经理" in (me["role_name"] or "")):
-        rows = db.query_all(
-            "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
-            (me["zone"],))
-        return [r for r in rows if has_substantive(r)]
-    # 普通执行角色：仅 role_access 授权板块
-    pairs = get_accessible_pairs(s)
-    if not pairs:
+    if not me:
         return []
-    where = " OR ".join(["(battle_id=%s AND warzone_id=%s)"] * len(pairs))
-    args = []
-    for b, w in pairs:
-        args.extend([b, w])
-    sql = f"SELECT * FROM deployment_records WHERE {where} ORDER BY sort_order, id"
-    rows = db.query_all(sql, args)
-    return [r for r in rows if has_substantive(r)]
+    user_role = me["role_name"] or ""
+
+    # 1) 作战角色匹配：combat_role 包含自己角色的记录
+    all_rows = db.query_all("SELECT * FROM deployment_records ORDER BY sort_order, id")
+    result = []
+    seen_ids = set()
+    for r in all_rows:
+        if not has_substantive(r):
+            continue
+        combat = str(r.get("combat_role", "") or "")
+        if match_combat_role(user_role, combat):
+            result.append(r)
+            seen_ids.add(r["id"])
+
+    # 2) role_access 额外授权（战役×战区组合）
+    pairs = get_accessible_pairs(s)
+    if pairs:
+        for r in all_rows:
+            if r["id"] in seen_ids:
+                continue
+            if not has_substantive(r):
+                continue
+            bid, wid = r.get("battle_id"), r.get("warzone_id")
+            if (bid, wid) in pairs:
+                result.append(r)
+                seen_ids.add(r["id"])
+
+    return result
 
 
 def battle_lookup() -> Dict[str, dict]:
@@ -323,7 +421,7 @@ def get_scenes(rows: List[dict], path_no: str) -> List[dict]:
 @app.get("/")
 def index():
     with open(os.path.join(BASE_DIR, "static", "index.html"), encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+        return HTMLResponse(f.read(), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/admin")
@@ -331,7 +429,7 @@ def admin_page():
     p = os.path.join(BASE_DIR, "static", "admin.html")
     if os.path.exists(p):
         with open(p, encoding="utf-8") as f:
-            return HTMLResponse(f.read())
+            return HTMLResponse(f.read(), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     raise HTTPException(404, "管理页面未生成")
 
 
@@ -354,24 +452,30 @@ def roles():
 
 @app.post("/api/login")
 async def login(request: Request):
-    """兼容前端：role_id 或 username 字段任一即可"""
+    """手机号+密码登录"""
     body = await request.json()
-    rid = body.get("role_id") or body.get("username") or ""
+    phone = (body.get("phone") or body.get("username") or body.get("role_id") or "").strip()
     pwd = body.get("password") or ""
-    if not rid or not pwd:
-        raise HTTPException(400, "参数不完整")
-    user = db.query_one("SELECT * FROM users WHERE username=%s AND is_active=1", (rid,))
+    if not phone or not pwd:
+        raise HTTPException(400, "请输入手机号和密码")
+    user = db.query_one("SELECT * FROM users WHERE phone=%s AND is_active=1", (phone,))
+    if not user:
+        # 兼容 admin 账号
+        user = db.query_one("SELECT * FROM users WHERE username=%s AND is_active=1", (phone,))
     if not user or not verify_password(user["password_hash"], user["password_salt"], pwd):
-        raise HTTPException(401, "岗位或密码错误")
-    info = get_user_info(rid)
+        log_login(phone, "", "", request, False, "手机号或密码错误")
+        raise HTTPException(401, "手机号或密码错误")
+    info = get_user_info(user["username"])
     token = _sign({
         "username": user["username"],
         "role_id": user["role_id"],
         "is_admin": bool(user["is_admin"]),
         "is_zone_admin": bool(user.get("is_zone_admin", 0)),
         "zone": user.get("zone", ""),
+        "must_change_pwd": bool(user.get("must_change_pwd", 0)),
         "expire": time.time() + TOKEN_TTL,
     })
+    log_login(user["username"], user["name"], user["role_name"], request, True)
     return {"token": token, "role": info}
 
 
@@ -386,6 +490,30 @@ def me(request: Request):
     """当前登录人信息（前端可据此判断是否显示管理入口）"""
     s = require_session(request)
     return get_user_info(s["username"])
+
+
+@app.post("/api/change-password")
+async def change_password(request: Request):
+    """修改自己的密码（首次登录强制改密 / 所有人可随时改密）"""
+    s = require_session(request)
+    body = await request.json()
+    old_pwd = body.get("old_password") or ""
+    new_pwd = body.get("new_password") or ""
+    if not old_pwd or not new_pwd:
+        raise HTTPException(400, "请输入旧密码和新密码")
+    user = db.query_one("SELECT * FROM users WHERE username=%s AND is_active=1", (s["username"],))
+    if not user or not verify_password(user["password_hash"], user["password_salt"], old_pwd):
+        raise HTTPException(400, "旧密码错误")
+    err = validate_strong_password(new_pwd)
+    if err:
+        raise HTTPException(400, err)
+    if new_pwd == old_pwd:
+        raise HTTPException(400, "新密码不能与旧密码相同")
+    salt = secrets.token_hex(8)
+    h = hashlib.sha256((new_pwd + salt).encode()).hexdigest()
+    db.execute("UPDATE users SET password_hash=%s,password_salt=%s,must_change_pwd=0 WHERE username=%s",
+               (h, salt, s["username"]))
+    return {"ok": True}
 
 
 # ====== 业务 API（保持原前端契约）======
@@ -470,66 +598,48 @@ def search(request: Request, keyword: str = ""):
 @app.get("/api/role-battles/{role_name}")
 def role_battles(role_name: str, request: Request):
     """查看某角色的战役信息（兵种标签点击）
-    兵种标签显示 users.role_name：
-    - 分局长/客户经理：通过战区自动权限查本战区全部数据
-    - 其他角色：通过 role_access 表查授权的战役/战区
+    根据角色名，查询 combat_role 包含该角色的部署记录，
+    返回战役×战区分布。
     """
     s = require_session(request)
     role_name = (role_name or "").strip()
     if not role_name:
         raise HTTPException(400, "角色名不能为空")
-    u = db.query_one("SELECT role_id,zone,role_name FROM users WHERE role_name=%s AND is_active=1 LIMIT 1", (role_name,))
+
     bl, wl = battle_lookup(), warzone_lookup()
+    # 管理员看所有，战区管理员看本战区，普通用户看自己可见范围
+    if s.get("is_admin"):
+        rows = db.query_all("SELECT * FROM deployment_records ORDER BY sort_order,id")
+    elif s.get("is_zone_admin"):
+        rows = db.query_all("SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order,id",
+                            (s.get("zone", ""),))
+    else:
+        rows = get_role_rows(s)
+
+    rows = [r for r in rows if has_substantive(r)]
+    # 按 combat_role 匹配过滤
+    matched = [r for r in rows if match_combat_role(role_name, str(r.get("combat_role", "") or ""))]
+
+    battle_map: Dict[str, Dict[str, int]] = {}
+    for r in matched:
+        bid, zid = r.get("battle_id"), r.get("warzone_id")
+        if bid and zid:
+            battle_map.setdefault(bid, {})[zid] = battle_map.get(bid, {}).get(zid, 0) + 1
+
     battles = []
-
-    if u:
-        urn = u["role_name"] or ""
-        is_zone_mgr = "分局长" in urn or "客户经理" in urn
-
-        if is_zone_mgr and u.get("zone"):
-            # 分局长/客户经理：本战区全部数据
-            rows = db.query_all(
-                "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order,id",
-                (u["zone"],))
-            rows = [r for r in rows if has_substantive(r)]
-            battle_map: Dict[str, Dict[str, int]] = {}
-            for r in rows:
-                bid, zid = r.get("battle_id"), r.get("warzone_id")
-                if bid and zid:
-                    battle_map.setdefault(bid, {})[zid] = battle_map.get(bid, {}).get(zid, 0) + 1
-            for bid in sorted(battle_map.keys()):
-                b = bl.get(bid)
-                if not b:
-                    continue
-                zones = []
-                total = 0
-                for zid, zcnt in battle_map[bid].items():
-                    w = wl.get(zid)
-                    if w:
-                        zones.append({"id": w["id"], "name": w["name"], "color": w["color"], "count": zcnt})
-                        total += zcnt
-                battles.append({"id": b["id"], "name": b["name"], "color": b["color"],
-                                "count": total, "zones": zones})
-        else:
-            # 普通角色：查 role_access 表
-            pairs = db.query_all("SELECT DISTINCT battle_id,warzone_id FROM role_access WHERE role_id=%s", (u["role_id"],))
-            for p in pairs:
-                bid, zid = p["battle_id"], p["warzone_id"]
-                cnt_r = db.query_one(
-                    "SELECT COUNT(*) c FROM deployment_records WHERE battle_id=%s AND warzone_id=%s",
-                    (bid, zid))
-                cnt = cnt_r["c"] if cnt_r else 0
-                if cnt > 0:
-                    b = bl.get(bid)
-                    w = wl.get(zid)
-                    if b and w:
-                        existing = next((x for x in battles if x["id"] == bid), None)
-                        if existing:
-                            existing["zones"].append({"id": w["id"], "name": w["name"], "color": w["color"], "count": cnt})
-                            existing["count"] += cnt
-                        else:
-                            battles.append({"id": b["id"], "name": b["name"], "color": b["color"],
-                                            "count": cnt, "zones": [{"id": w["id"], "name": w["name"], "color": w["color"], "count": cnt}]})
+    for bid in sorted(battle_map.keys()):
+        b = bl.get(bid)
+        if not b:
+            continue
+        zones = []
+        total = 0
+        for zid, zcnt in battle_map[bid].items():
+            w = wl.get(zid)
+            if w:
+                zones.append({"id": w["id"], "name": w["name"], "color": w["color"], "count": zcnt})
+                total += zcnt
+        battles.append({"id": b["id"], "name": b["name"], "color": b["color"],
+                        "count": total, "zones": zones})
 
     return {"role_name": role_name, "battles": battles, "total": sum(b["count"] for b in battles)}
 
@@ -704,7 +814,7 @@ def admin_users(request: Request, q: str = "", zone: str = ""):
     """人员列表（支持关键词 q 与战区过滤）"""
     s = require_zone_admin(request)
     zf = get_zone_filter(s)
-    sql = ("SELECT id,username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,is_active,"
+    sql = ("SELECT id,username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,is_active,must_change_pwd,"
            "created_at FROM users WHERE 1=1")
     args = []
     # 战区指导只能看本战区人员
@@ -728,64 +838,91 @@ async def admin_create_user(request: Request):
     s = require_zone_admin(request)
     zf = get_zone_filter(s)
     body = await request.json()
-    username = (body.get("username") or "").strip()
+    username = (body.get("username") or "").strip()  # 手机号
     role_name = (body.get("role_name") or "").strip()
     zone = (body.get("zone") or "public").strip()
     if not username or not role_name:
-        raise HTTPException(400, "登录账号与岗位名必填")
-    # 战区指导只能在所属战区新增人员
+        raise HTTPException(400, "手机号与角色必填")
+    # 战区管理员只能在所属战区新增人员
     if zf and zone != zf:
         raise HTTPException(403, "只能在所属战区新增人员")
-    if db.query_one("SELECT id FROM users WHERE username=%s", (username,)):
-        raise HTTPException(400, "登录账号已存在")
+    if db.query_one("SELECT id FROM users WHERE username=%s OR phone=%s", (username, username)):
+        raise HTTPException(400, "该手机号已存在")
     wl = warzone_lookup()
     w = wl.get(zone) or next(iter(wl.values()), {"name": "公众战区", "color": "#1565c0"})
-    import secrets as _s
-    salt = _s.token_hex(8)
-    pwd = (body.get("password") or "123456").strip()
+    salt = secrets.token_hex(8)
+    pwd = (body.get("password") or "Xs@2026").strip()
+    # 新增人员时校验强密码
+    err = validate_strong_password(pwd)
+    if err:
+        raise HTTPException(400, f"初始密码不符合规范：{err}")
     h = hashlib.sha256((pwd + salt).encode()).hexdigest()
+    is_zone_admin = 1 if body.get("is_zone_admin") else 0
+    # 战区管理员不能创建全局管理员
+    is_admin = 1 if body.get("is_admin") and not zf else 0
     nid = db.execute(
-        "INSERT INTO users(username,name,role_id,role_name,phone,password_hash,password_salt,"
-        "zone,zone_name,color,is_admin,is_zone_admin) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-        (username, body.get("name") or role_name, username, role_name, body.get("phone", ""),
-         h, salt, zone, w["name"], w["color"], 1 if body.get("is_admin") else 0, 0))
+        "INSERT INTO users(username,name,role_id,role_name,phone,password_hash,password_salt,must_change_pwd,"
+        "zone,zone_name,color,is_admin,is_zone_admin) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (username, body.get("name") or role_name, username, role_name, username,
+         h, salt, 1, zone, w["name"], w["color"], is_admin, is_zone_admin))
+    log_access(s["username"], s.get("name", ""), "create", "user", str(nid),
+               json.dumps({"username": username, "name": body.get("name"), "role_name": role_name, "zone": zone}, ensure_ascii=False),
+               request)
     return {"ok": True, "id": nid}
 
 
 @app.put("/api/admin/users/{uid}")
 async def admin_update_user(uid: int, request: Request):
-    """编辑人员（支持改密码/电话/姓名/战区/管理员标记）"""
+    """编辑人员（支持改密码/电话/姓名/战区/角色/管理员标记）"""
     s = require_zone_admin(request)
     zf = get_zone_filter(s)
     body = await request.json()
     cur = db.query_one("SELECT * FROM users WHERE id=%s", (uid,))
     if not cur:
         raise HTTPException(404, "人员不存在")
-    # 战区指导只能编辑本战区人员
+    # 战区管理员只能编辑本战区人员
     if zf and cur["zone"] != zf:
         raise HTTPException(403, "只能编辑所属战区的人员")
     name = body.get("name", cur["name"])
-    phone = body.get("phone", cur["phone"])
-    is_admin = 1 if body.get("is_admin") else 0
+    phone = body.get("phone", cur["phone"]) or body.get("username", cur["username"])
     zone = body.get("zone", cur["zone"])
-    # 战区指导不能把人员转到其他战区
+    # 战区管理员不能把人员转到其他战区
     if zf and zone != zf:
         raise HTTPException(403, "不能转移到其他战区")
+    # 权限标记：战区管理员不能提升为全局管理员
+    if zf:
+        is_admin = cur["is_admin"]  # 保持不变
+    else:
+        is_admin = 1 if body.get("is_admin") else 0
+    is_zone_admin = 1 if body.get("is_zone_admin") else 0
+    # 战区管理员不能修改其他人的 is_zone_admin（避免互相提权）
+    if zf and is_zone_admin and cur["is_zone_admin"] == 0:
+        is_zone_admin = 0  # 普通管理员创建的不能设为战区管理员
+    if not zf:
+        is_zone_admin = 1 if body.get("is_zone_admin") else 0
     wl = warzone_lookup()
     w = wl.get(zone)
     zone_name = w["name"] if w else cur["zone_name"]
     color = w["color"] if w else cur["color"]
     role_name = body.get("role_name", cur["role_name"])
     if body.get("password"):
+        err = validate_strong_password(body["password"])
+        if err:
+            raise HTTPException(400, f"密码不符合规范：{err}")
         salt = secrets.token_hex(8)
         h = hashlib.sha256((body["password"] + salt).encode()).hexdigest()
-        db.execute("UPDATE users SET name=%s,phone=%s,role_name=%s,zone=%s,zone_name=%s,color=%s,"
-                   "is_admin=%s,password_hash=%s,password_salt=%s WHERE id=%s",
-                   (name, phone, role_name, zone, zone_name, color, is_admin, h, salt, uid))
+        db.execute("UPDATE users SET name=%s,phone=%s,username=%s,role_name=%s,zone=%s,zone_name=%s,color=%s,"
+                   "is_admin=%s,is_zone_admin=%s,password_hash=%s,password_salt=%s,must_change_pwd=1 WHERE id=%s",
+                   (name, phone, phone, role_name, zone, zone_name, color,
+                    is_admin, is_zone_admin, h, salt, uid))
     else:
-        db.execute("UPDATE users SET name=%s,phone=%s,role_name=%s,zone=%s,zone_name=%s,color=%s,"
-                   "is_admin=%s WHERE id=%s",
-                   (name, phone, role_name, zone, zone_name, color, is_admin, uid))
+        db.execute("UPDATE users SET name=%s,phone=%s,username=%s,role_name=%s,zone=%s,zone_name=%s,color=%s,"
+                   "is_admin=%s,is_zone_admin=%s WHERE id=%s",
+                   (name, phone, phone, role_name, zone, zone_name, color,
+                    is_admin, is_zone_admin, uid))
+    log_access(s["username"], s.get("name", ""), "update", "user", str(uid),
+               json.dumps({"name": name, "role_name": role_name, "zone": zone, "is_admin": is_admin, "is_zone_admin": is_zone_admin}, ensure_ascii=False),
+               request)
     return {"ok": True}
 
 
@@ -806,6 +943,8 @@ async def admin_delete_user(uid: int, request: Request, hard: int = 0):
         db.execute("DELETE FROM users WHERE id=%s", (uid,))
     else:
         db.execute("UPDATE users SET is_active=0 WHERE id=%s", (uid,))
+    log_access(s["username"], s.get("name", ""), "delete", "user", str(uid),
+               json.dumps({"hard": hard, "target_name": cur.get("name", "")}, ensure_ascii=False), request)
     return {"ok": True}
 
 
@@ -825,14 +964,16 @@ def admin_get_access(request: Request, role_id: str = ""):
     for r in rules:
         if role_id:
             granted.add((r["battle_id"], r["warzone_id"]))
-    # 角色清单（去重）：战区指导只能看本战区角色
+    # 人员清单（战区管理员只能看本战区人员）
     if zf:
         roles = db.query_all(
-            "SELECT DISTINCT role_id,role_name,zone_name FROM users WHERE is_admin=0 AND is_zone_admin=0 AND zone=%s ORDER BY role_name",
+            "SELECT username AS role_id,name AS role_name,role_name AS role_label,zone_name FROM users "
+            "WHERE is_admin=0 AND is_zone_admin=0 AND is_active=1 AND zone=%s ORDER BY role_name",
             (zf,))
     else:
         roles = db.query_all(
-            "SELECT DISTINCT role_id,role_name,zone_name FROM users WHERE is_admin=0 AND is_zone_admin=0 ORDER BY zone_name,role_name")
+            "SELECT username AS role_id,name AS role_name,role_name AS role_label,zone_name FROM users "
+            "WHERE is_admin=0 AND is_zone_admin=0 AND is_active=1 ORDER BY zone_name,role_name")
     return {
         "battles": battles, "warzones": warzones, "roles": roles,
         "granted": [[g[0], g[1]] for g in granted] if role_id else rules,
@@ -859,6 +1000,9 @@ async def admin_set_access(request: Request):
     if grants:
         db.executemany("INSERT IGNORE INTO role_access(role_id,battle_id,warzone_id) VALUES(%s,%s,%s)",
                        [(role_id, g["battle_id"], g["warzone_id"]) for g in grants])
+    operator_info = db.query_one("SELECT name FROM users WHERE username=%s", (s["username"],))
+    log_access(s["username"], (operator_info or {}).get("name", ""), "grant", "role_access", role_id,
+               json.dumps({"grants": len(grants)}, ensure_ascii=False), request)
     return {"ok": True, "granted": len(grants)}
 
 

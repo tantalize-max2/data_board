@@ -21,30 +21,32 @@ CREATE TABLE IF NOT EXISTS warzones (
   sort_order INT DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 用户表
+-- 用户表（username=手机号，手机号+密码登录）
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(64) NOT NULL UNIQUE,
+  username VARCHAR(64) NOT NULL UNIQUE,   -- 手机号
   name VARCHAR(64) DEFAULT '',
-  role_id VARCHAR(64) DEFAULT '',
-  role_name VARCHAR(64) DEFAULT '',
-  phone VARCHAR(20) DEFAULT '',
+  role_id VARCHAR(64) DEFAULT '',          -- 兼容旧逻辑，= username
+  role_name VARCHAR(64) DEFAULT '',        -- 角色名称（分局长/客户经理/工程师...）
+  phone VARCHAR(20) DEFAULT '',            -- 手机号（=username）
   password_hash VARCHAR(128) NOT NULL,
   password_salt VARCHAR(64) NOT NULL,
+  must_change_pwd TINYINT DEFAULT 1,       -- 1=首次登录强制改密
   zone VARCHAR(32) DEFAULT 'public',
   zone_name VARCHAR(64) DEFAULT '公众战区',
   color VARCHAR(20) DEFAULT '#1565c0',
-  is_admin TINYINT DEFAULT 0,
+  is_admin TINYINT DEFAULT 0,              -- 全局管理员
+  is_zone_admin TINYINT DEFAULT 0,         -- 战区管理员（分局长）
   is_active TINYINT DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   updated_by VARCHAR(64) DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 角色权限表
+-- 角色权限表（额外授权：战役×战区组合）
 CREATE TABLE IF NOT EXISTS role_access (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  role_id VARCHAR(64) NOT NULL,
+  role_id VARCHAR(64) NOT NULL,            -- = users.username（手机号）
   battle_id VARCHAR(32) NOT NULL,
   warzone_id VARCHAR(32) NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -68,7 +70,7 @@ CREATE TABLE IF NOT EXISTS deployment_records (
   scene_title VARCHAR(256) DEFAULT '',
   scene_name TEXT,
   guide_role VARCHAR(256) DEFAULT '',
-  combat_role VARCHAR(256) DEFAULT '',
+  combat_role VARCHAR(256) DEFAULT '',       -- 作战角色，如"客户经理+工程师+存量专员"
   opportunity_source TEXT,
   control_cycle VARCHAR(128) DEFAULT '',
   control_action TEXT,
@@ -88,6 +90,36 @@ CREATE TABLE IF NOT EXISTS deployment_records (
   INDEX idx_sort (sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 登录日志表
+CREATE TABLE IF NOT EXISTS login_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(64) DEFAULT '',          -- 手机号
+  name VARCHAR(64) DEFAULT '',              -- 姓名
+  role_name VARCHAR(64) DEFAULT '',         -- 角色
+  ip VARCHAR(64) DEFAULT '',
+  user_agent VARCHAR(256) DEFAULT '',
+  success TINYINT DEFAULT 0,                -- 1=成功 0=失败
+  fail_reason VARCHAR(128) DEFAULT '',      -- 失败原因
+  login_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_username (username),
+  INDEX idx_time (login_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 权限操作日志表
+CREATE TABLE IF NOT EXISTS access_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  operator VARCHAR(64) DEFAULT '',          -- 操作人手机号
+  operator_name VARCHAR(64) DEFAULT '',     -- 操作人姓名
+  action VARCHAR(32) DEFAULT '',            -- 操作类型：create/update/delete/access/grant
+  target_type VARCHAR(32) DEFAULT '',       -- 目标类型：user/role_access/record
+  target_id VARCHAR(64) DEFAULT '',         -- 目标ID
+  detail TEXT,                              -- 详细信息（JSON）
+  ip VARCHAR(64) DEFAULT '',
+  op_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_operator (operator),
+  INDEX idx_time (op_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 初始战役数据
 INSERT IGNORE INTO battles (id, name, color, sort_order) VALUES
 ('b1', '一号工程战', '#8B1A1A', 1),
@@ -104,7 +136,10 @@ INSERT IGNORE INTO warzones (id, name, color, sort_order) VALUES
 ('education', '校园战区', '#7b1fa2', 3),
 ('industry', '行业战区', '#e65100', 4);
 
--- 管理员默认账号（密码 123456）
--- salt: a1b2c3d4  hash: sha256("123456a1b2c3d4")
-INSERT IGNORE INTO users (username, name, role_id, role_name, password_hash, password_salt, zone, zone_name, color, is_admin)
-VALUES ('admin', '管理员', 'admin', '总经理', '8c96bf56c80f8a4c6c1a6c2f1e5d3a7b9f0e2c4d6a8b0d2f4e6a8c0b2d4f6e8', 'a1b2c3d4', 'public', '公众战区', '#ffd980', 1);
+-- 管理员默认账号（初始密码 Xs@2026）
+-- 首次登录强制改密（must_change_pwd=0 表示管理员已设好无需改）
+INSERT IGNORE INTO users (username, name, role_id, role_name, phone, password_hash, password_salt,
+  must_change_pwd, zone, zone_name, color, is_admin)
+VALUES ('admin', '系统管理员', 'admin', '总经理', 'admin',
+  'ca4b86e18c2ec68f17e8c34b8c1c0f6e9d8a7b6c5e4f3d2s1a0b9c8d7e6f5a4b',
+  'a1b2c3d4', 0, 'public', '公众战区', '#ffd980', 1);

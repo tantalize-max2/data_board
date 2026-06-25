@@ -143,15 +143,14 @@ async function fetchUsers(){
     tb.innerHTML=`
       <div class="table-scroll">
         <table class="data-table">
-          <thead><tr><th>姓名</th><th>岗位</th><th>战区</th><th>电话</th><th>登录账号</th><th>角色</th><th>状态</th><th>操作</th></tr></thead>
+          <thead><tr><th>姓名</th><th>岗位</th><th>战区</th><th>手机号</th><th>角色</th><th>状态</th><th>操作</th></tr></thead>
           <tbody>${data.users.map(u=>`
             <tr>
               <td style="font-weight:700">${esc(u.name)}</td>
               <td>${esc(u.role_name)}</td>
               <td><span class="tag ${ZONE_CLASS[u.zone]||''}">${esc(ZONE_LABEL[u.zone]||u.zone_name)}</span></td>
-              <td style="color:var(--text-dim)">${esc(u.phone||'—')}</td>
-              <td style="font-size:11px;color:var(--text-dim)">${esc(u.username)}</td>
-              <td>${u.is_admin?'<span class="tag tag-admin">管理员</span>':'<span style="color:var(--text-dim)">普通</span>'}</td>
+              <td style="color:var(--text-dim)">${esc(u.phone||u.username||'—')}</td>
+              <td>${u.is_admin?'<span class="tag tag-admin">管理员</span>':u.is_zone_admin?'<span class="tag" style="background:rgba(0,212,255,.15);color:var(--cyan)">战区管理员</span>':'<span style="color:var(--text-dim)">普通</span>'}</td>
               <td>${u.is_active?'<span class="tag tag-active">在用</span>':'<span class="tag tag-stopped">停用</span>'}</td>
               <td>
                 <button class="btn btn-ghost btn-sm" onclick="openUserEdit(${u.id})">编辑</button>
@@ -180,10 +179,10 @@ async function openUserEdit(uid){
     <div class="form-grid">
       <div class="form-field"><label>姓名</label><input id="f_name" value="${esc(u?.name||'')}"></div>
       <div class="form-field"><label>岗位名称</label><input id="f_role_name" value="${esc(u?.role_name||'')}"></div>
-      <div class="form-field"><label>电话 <span class="hint">（暂未用于登录）</span></label><input id="f_phone" value="${esc(u?.phone||'')}"></div>
+      <div class="form-field"><label>手机号 <span class="hint">（用于登录）</span></label><input id="f_phone" value="${esc(u?.phone||u?.username||'')}" placeholder="请输入手机号"></div>
       <div class="form-field"><label>所属战区</label><select id="f_zone" ${zoneLocked?'disabled':''}>${zones.map(([k,v])=>`<option value="${k}"${currentZone===k?' selected':''}>${v}</option>`).join('')}</select></div>
-      <div class="form-field"><label>登录账号 <span class="hint">${uid?'留空不修改':'默认同岗位'}</span></label><input id="f_username" value="${esc(u?.username||'')}" ${uid?'':'placeholder="默认同岗位名"'}></div>
-      <div class="form-field"><label>密码 <span class="hint">${uid?'留空不修改':'默认 123456'}</span></label><input id="f_password" type="password" placeholder="留空不修改"></div>
+      <div class="form-field"><label>密码 <span class="hint">${uid?'留空不修改':'默认 Xs@2026'}</span></label><input id="f_password" type="password" placeholder="留空不修改"></div>
+      <div class="form-field"><label>战区管理员</label><div class="checkbox-row"><input id="f_zone_admin" type="checkbox" ${u?.is_zone_admin?'checked':''}> <label for="f_zone_admin" style="margin:0">设为战区管理员（可管理本战区人员与内容）</label></div></div>
       <div class="form-field full"><div class="checkbox-row"><input id="f_admin" type="checkbox" ${u?.is_admin?'checked':''}> <label for="f_admin" style="margin:0">设为总经理（可访问全部数据与管理后台）</label></div></div>
     </div>`,
     `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveUser(${uid||0})">保存</button>`);
@@ -196,15 +195,16 @@ async function saveUser(uid){
     role_name:document.getElementById('f_role_name').value.trim(),
     phone:document.getElementById('f_phone').value.trim(),
     zone:zoneEl.value||zoneEl.querySelector('option[selected]')?.value||ME?.zone||'public',
-    username:document.getElementById('f_username').value.trim(),
     password:document.getElementById('f_password').value,
     is_admin:document.getElementById('f_admin').checked,
+    is_zone_admin:document.getElementById('f_zone_admin')?document.getElementById('f_zone_admin').checked:false,
   };
   if(!body.name||!body.role_name){toast('姓名与岗位必填','error');return;}
+  if(!body.phone){toast('手机号必填','error');return;}
+  body.username=body.phone;  /* 手机号即账号 */
   try{
     if(uid) await api('/api/admin/users/'+uid,{method:'PUT',body});
     else{
-      if(!body.username) body.username=body.role_name;
       await api('/api/admin/users',{method:'POST',body});
     }
     toast(uid?'已更新':'已新增','success'); closeModal(); fetchUsers();

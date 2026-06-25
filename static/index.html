@@ -15,7 +15,7 @@
     <span class="login-corner-bl"></span><span class="login-corner-br"></span>
     <h1>百日攻坚"夏收"行动标准化穿透部署</h1>
     <div class="sub"></div>
-    <div class="field"><label>选择角色</label><select id="selRole"></select></div>
+    <div class="field"><label>手机号</label><input type="text" id="txtPhone" placeholder="请输入手机号" onkeydown="if(event.key==='Enter')document.getElementById('txtPwd').focus()"></div>
     <div class="field"><label>输入密码</label><input type="password" id="txtPwd" placeholder="请输入密码"></div>
     <button class="btn" onclick="doLogin()">登 录</button>
     <div class="error" id="loginErr"></div>
@@ -29,6 +29,7 @@
     <div class="header-user">
       <span class="zone-badge" id="mainZoneBadge"></span>
       <span class="role-badge" id="mainRoleBadge"></span>
+      <button class="btn-admin" id="btnChangePwd" onclick="openChangePwdModal()">修改密码</button>
       <button class="btn-admin" id="btnAdmin" style="display:none" onclick="openAdmin()">管理后台</button>
       <button class="btn-logout" onclick="doLogout()">退出</button>
     </div>
@@ -144,6 +145,33 @@
     </div>
   </div>
 </div>
+
+<!-- 修改密码弹窗 -->
+<div class="modal-mask" id="changePwdMask" onclick="if(event.target===this)closeChangePwdModal()">
+  <div class="modal-box modal-sm">
+    <div class="modal-header"><h3 id="changePwdTitle">修改密码</h3><button class="modal-close" onclick="closeChangePwdModal()">&times;</button></div>
+    <div class="modal-body">
+      <div id="changePwdAlert" style="display:none;background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.3);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#ffc107">
+        首次登录，请修改初始密码后继续使用
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">旧密码</label>
+          <input type="password" class="prompt-input" id="oldPwd" placeholder="请输入旧密码"></div>
+        <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">新密码 <span style="color:var(--text-dim);font-size:11px">(至少8位，含大小写字母+数字+特殊符号)</span></label>
+          <input type="password" class="prompt-input" id="newPwd" placeholder="请输入新密码"></div>
+        <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">确认新密码</label>
+          <input type="password" class="prompt-input" id="newPwd2" placeholder="请再次输入新密码"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-no" id="changePwdCancel" onclick="closeChangePwdModal()">取消</button>
+      <button class="modal-btn modal-btn-ok" onclick="doChangePwd()">确认修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 水印层 -->
+<div class="watermark-layer" id="watermarkLayer"></div>
 
 <!-- Toast 通知 -->
 <div class="toast-container" id="toastContainer"></div>

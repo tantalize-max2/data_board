@@ -1,20 +1,8 @@
 /* ====== 夏收行动部署看板 - 前端逻辑 ====== */
 let TOKEN='',ROLE=null;
 
-/* 角色列表从后端动态拉取 */
+/* 检测 token：URL 参数（管理后台返回） > localStorage（持久登录） */
 (async function(){
-  const sel=document.getElementById('selRole');
-  try{
-    const res=await fetch('/api/roles');
-    const groups=await res.json();
-    ['管理层','公众战区','商业战区','校园战区','行业战区'].forEach((g,idx)=>{
-      if(!groups[g])return;
-      if(idx>0){const sep=document.createElement('option');sep.disabled=true;sep.text='──────────';sep.style.color='var(--cyan)';sep.style.fontWeight='700';sel.appendChild(sep);}
-      const head=document.createElement('option');head.disabled=true;head.text='【 '+g+' 】';head.style.color='var(--cyan)';head.style.fontWeight='700';sel.appendChild(head);
-      groups[g].forEach(r=>{const o=document.createElement('option');o.value=r.id;o.text='  '+r.name;sel.appendChild(o);});
-    });
-  }catch(e){sel.innerHTML='<option>角色加载失败</option>'}
-  /* 检测 token：URL 参数（管理后台返回） > localStorage（持久登录） */
   const urlToken=new URLSearchParams(location.search).get('token');
   const savedToken=urlToken||localStorage.getItem('xs_token');
   if(savedToken){
@@ -26,8 +14,9 @@ let TOKEN='',ROLE=null;
         localStorage.setItem('xs_token',TOKEN);
         if(urlToken) history.replaceState(null,'','/');
         showPage('main');loadMainPage();
+        /* 首次登录强制改密 */
+        if(ROLE.must_change_pwd){openChangePwdModal(true);}
       }else{
-        /* token 失效，清除并回到登录页 */
         localStorage.removeItem('xs_token');
         showPage('login');
       }
@@ -62,26 +51,35 @@ function goMain(){PAGE_HISTORY=[];showPage('main');}
 function openAdmin(){location.href='/admin?token='+encodeURIComponent(TOKEN);}
 
 async function doLogin(){
-  const rid=document.getElementById('selRole').value,pwd=document.getElementById('txtPwd').value;
-  if(!rid){showErr('请选择角色');return;}if(!pwd){showErr('请输入密码');return;}
+  const phone=document.getElementById('txtPhone').value.trim();
+  const pwd=document.getElementById('txtPwd').value;
+  if(!phone){showErr('请输入手机号');return;}
+  if(!pwd){showErr('请输入密码');return;}
   try{
-    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role_id:rid,password:pwd})});
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:phone,password:pwd})});
     if(!res.ok){const d=await res.json();showErr(d.detail||'登录失败');return;}
-    const data=await res.json();TOKEN=data.token;ROLE=data.role;PAGE_HISTORY=['main'];localStorage.setItem('xs_token',TOKEN);showPage('main');loadMainPage();
+    const data=await res.json();TOKEN=data.token;ROLE=data.role;PAGE_HISTORY=['main'];localStorage.setItem('xs_token',TOKEN);
+    document.getElementById('txtPhone').value='';document.getElementById('txtPwd').value='';document.getElementById('loginErr').textContent='';
+    showPage('main');loadMainPage();
+    /* 首次登录强制改密 */
+    if(ROLE.must_change_pwd){openChangePwdModal(true);}
   }catch(e){showErr('网络错误');}
 }
 function showErr(m){document.getElementById('loginErr').textContent=m;}
 async function doLogout(){
   try{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN})});}catch(e){}
-  TOKEN='';ROLE=null;PAGE_HISTORY=[];localStorage.removeItem('xs_token');document.getElementById('txtPwd').value='';document.getElementById('loginErr').textContent='';showPage('login');
+  TOKEN='';ROLE=null;PAGE_HISTORY=[];localStorage.removeItem('xs_token');
+  document.getElementById('txtPhone').value='';document.getElementById('txtPwd').value='';document.getElementById('loginErr').textContent='';
+  updateWatermark();showPage('login');
 }
 
 /* ====== 主页 ====== */
 async function loadMainPage(){
-  document.getElementById('mainRoleBadge').textContent=ROLE.name;
+  document.getElementById('mainRoleBadge').textContent=ROLE.name+'_'+ROLE.role_name;
   document.getElementById('mainRoleBadge').style.background='linear-gradient(135deg,rgba(0,212,255,.15),rgba(46,125,255,.12))';
   document.getElementById('mainZoneBadge').textContent=ROLE.zone_name;
   document.getElementById('mainZoneBadge').style.background=ROLE.color+'44';
+  updateWatermark();
   const isAdmin=!!ROLE.is_admin;
   const isZoneAdmin=!!ROLE.is_zone_admin;
   const canAdmin=isAdmin||isZoneAdmin;
@@ -1200,3 +1198,58 @@ function formatSize(bytes){
   if(bytes<1073741824)return (bytes/1048576).toFixed(1)+' MB';
   return (bytes/1073741824).toFixed(1)+' GB';
 }
+
+/* ====== 修改密码 ====== */
+function openChangePwdModal(force){
+  document.getElementById('oldPwd').value='';
+  document.getElementById('newPwd').value='';
+  document.getElementById('newPwd2').value='';
+  document.getElementById('changePwdAlert').style.display=force?'block':'none';
+  document.getElementById('changePwdCancel').style.display=force?'none':'inline-block';
+  document.getElementById('changePwdTitle').textContent=force?'首次登录 · 修改密码':'修改密码';
+  document.getElementById('changePwdMask').classList.add('show');
+}
+function closeChangePwdModal(){
+  document.getElementById('changePwdMask').classList.remove('show');
+}
+async function doChangePwd(){
+  const oldPwd=document.getElementById('oldPwd').value;
+  const newPwd=document.getElementById('newPwd').value;
+  const newPwd2=document.getElementById('newPwd2').value;
+  if(!oldPwd){showToast('请输入旧密码','error');return;}
+  if(!newPwd){showToast('请输入新密码','error');return;}
+  if(newPwd!==newPwd2){showToast('两次输入的新密码不一致','error');return;}
+  try{
+    const res=await fetch('/api/change-password?token='+encodeURIComponent(TOKEN),{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({old_password:oldPwd,new_password:newPwd})});
+    if(!res.ok){const d=await res.json();showToast(d.detail||'修改失败','error');return;}
+    showToast('密码修改成功','success');
+    ROLE.must_change_pwd=false;
+    closeChangePwdModal();
+  }catch(e){showToast('网络错误','error');}
+}
+
+/* ====== 水印 ====== */
+function updateWatermark(){
+  const layer=document.getElementById('watermarkLayer');
+  if(!layer)return;
+  if(!ROLE||!ROLE.name){layer.innerHTML='';layer.style.display='none';return;}
+  /* 主界面不显示水印 */
+  const activePage=document.querySelector('.page.active');
+  if(activePage&&activePage.id==='pageMain'){layer.innerHTML='';layer.style.display='none';return;}
+  /* 其他界面显示水印：姓名_电话 */
+  const text=ROLE.name+'_'+(ROLE.phone||ROLE.username||'');
+  let h='';
+  for(let i=0;i<40;i++){
+    h+='<div class="wm-item">'+esc(text)+'</div>';
+  }
+  layer.innerHTML=h;
+  layer.style.display='block';
+}
+
+/* 页面切换时更新水印（通过监听 DOM 变化） */
+const _wmObserver=new MutationObserver(()=>{updateWatermark();});
+document.querySelectorAll('.page').forEach(p=>{
+  _wmObserver.observe(p,{attributes:true,attributeFilter:['class']});
+});
