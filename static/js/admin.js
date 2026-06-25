@@ -74,7 +74,8 @@ function execAdminPrompt(){
 }
 
 function backToBoard(){
-  location.href='/?token='+encodeURIComponent(TOKEN);
+  localStorage.setItem('xs_token',TOKEN);
+  location.href='/';
 }
 
 /* 颜色映射：原始暖色 → 自然柔和色 */

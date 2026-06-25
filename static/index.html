@@ -15,8 +15,8 @@
     <span class="login-corner-bl"></span><span class="login-corner-br"></span>
     <h1>百日攻坚"夏收"行动标准化穿透部署</h1>
     <div class="sub"></div>
-    <div class="field"><label>手机号</label><input type="text" id="txtPhone" placeholder="请输入手机号" onkeydown="if(event.key==='Enter')document.getElementById('txtPwd').focus()"></div>
-    <div class="field"><label>输入密码</label><input type="password" id="txtPwd" placeholder="请输入密码"></div>
+    <div class="field"><label>手机号</label><input type="text" id="txtPhone" placeholder="请输入手机号" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('txtPwd').focus()"></div>
+    <div class="field"><label>输入密码</label><input type="password" id="txtPwd" placeholder="请输入密码" autocomplete="new-password"></div>
     <button class="btn" onclick="doLogin()">登 录</button>
     <div class="error" id="loginErr"></div>
   </div>

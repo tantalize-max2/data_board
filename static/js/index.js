@@ -1,10 +1,9 @@
 /* ====== 夏收行动部署看板 - 前端逻辑 ====== */
 let TOKEN='',ROLE=null,ROLE_FILTER='';
 
-/* 检测 token：URL 参数（管理后台返回） > localStorage（持久登录） */
+/* 检测 token：localStorage（持久登录） */
 (async function(){
-  const urlToken=new URLSearchParams(location.search).get('token');
-  const savedToken=urlToken||localStorage.getItem('xs_token');
+  const savedToken=localStorage.getItem('xs_token');
   if(savedToken){
     try{
       const meRes=await fetch('/api/me?token='+encodeURIComponent(savedToken));
@@ -12,7 +11,6 @@ let TOKEN='',ROLE=null,ROLE_FILTER='';
         const meData=await meRes.json();
         TOKEN=savedToken;ROLE=meData;
         localStorage.setItem('xs_token',TOKEN);
-        if(urlToken) history.replaceState(null,'','/');
         showPage('main');loadMainPage();
         /* 首次登录强制改密 */
         if(ROLE.must_change_pwd){openChangePwdModal(true);}
@@ -49,7 +47,7 @@ function goBack(){
   if(prev==='main')ROLE_FILTER='';
 }
 function goMain(){PAGE_HISTORY=[];showPage('main');}
-function openAdmin(){location.href='/admin?token='+encodeURIComponent(TOKEN);}
+function openAdmin(){sessionStorage.setItem('admin_token',TOKEN);location.href='/admin';}
 
 async function doLogin(){
   const phone=document.getElementById('txtPhone').value.trim();
