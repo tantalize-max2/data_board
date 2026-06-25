@@ -41,6 +41,18 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- 确认弹窗 -->
+<div class="modal-mask" id="confirmMask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center">
+  <div style="background:var(--bg-card,#1a2332);border:1px solid var(--border-hover,#2a3f5c);border-radius:12px;padding:0;width:360px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+    <div style="padding:18px 22px;font-size:16px;font-weight:700;color:#fff;border-bottom:1px solid var(--border-hover,#2a3f5c)" id="confirmTitle">确认操作</div>
+    <div style="padding:22px;font-size:14px;color:var(--text-secondary,#a0b4cc);line-height:1.6" id="confirmMsg"></div>
+    <div style="padding:0 22px 18px;display:flex;gap:10px;justify-content:flex-end">
+      <button id="confirmNoBtn" style="padding:8px 22px;border-radius:6px;border:1px solid var(--border-hover,#2a3f5c);background:transparent;color:var(--text-secondary,#a0b4cc);cursor:pointer;font-size:13px" onclick="closeAdminConfirm()">取消</button>
+      <button id="confirmYesBtn" style="padding:8px 22px;border-radius:6px;border:none;background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;cursor:pointer;font-size:13px;font-weight:600" onclick="execAdminConfirm()">确认</button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/js/admin.js"></script>
 </body>
 </html>

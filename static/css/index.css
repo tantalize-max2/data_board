@@ -682,8 +682,8 @@ body>*{position:relative;z-index:1}
   .hover-tip{display:none!important}
 }
 
-/* ====== 水印层（10个从左下到右上） ====== */
-.watermark-layer{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;display:none}
-.watermark-layer .wm-item{position:absolute;font-size:18px;font-weight:600;color:rgba(168,213,255,.08);
-  white-space:nowrap;transform:translate(-50%,-50%) rotate(-35deg);user-select:none;letter-spacing:2px}
+/* ====== 水印层（20个白色随机分散） ====== */
+.watermark-layer{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;display:none;overflow:visible}
+.watermark-layer .wm-item{position:absolute;font-size:20px;font-weight:700;color:rgba(255,255,255,.15);
+  white-space:nowrap;user-select:none;letter-spacing:2px;text-shadow:0 0 1px rgba(0,0,0,.5)}
 .watermark-layer:empty{display:none!important}

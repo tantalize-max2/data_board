@@ -1217,7 +1217,8 @@ function openChangePwdModal(force){
   document.getElementById('newPwd2').value='';
   document.getElementById('changePwdAlert').style.display=force?'block':'none';
   document.getElementById('changePwdCancel').style.display=force?'none':'inline-block';
-  document.getElementById('changePwdTitle').textContent=force?'首次登录 · 修改密码':'修改密码';
+  document.getElementById('changePwdCloseBtn').style.display=force?'none':'inline-block';
+  document.getElementById('changePwdTitle').textContent=force?'首次登录 · 必须修改密码':'修改密码';
   document.getElementById('changePwdMask').classList.add('show');
 }
 function closeChangePwdModal(){
@@ -1249,21 +1250,22 @@ function updateWatermark(){
   /* 主界面不显示水印 */
   const activePage=document.querySelector('.page.active');
   if(activePage&&activePage.id==='pageMain'){layer.innerHTML='';layer.style.display='none';return;}
-  /* 其他界面显示水印：姓名_电话，10个斜向排列 */
+  /* 其他界面显示水印：姓名_电话，20个随机分散 */
   const text=ROLE.name+'_'+(ROLE.phone||ROLE.username||'');
   let h='';
-  for(let i=0;i<10;i++){
-    /* 从左下(5%,90%)到右上(95%,10%)均匀分布 */
-    const xPct=5+(90*i/9);
-    const yPct=90-(80*i/9);
-    h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%">${esc(text)}</div>`;
+  for(let i=0;i<20;i++){
+    const xPct=5+Math.random()*90;
+    const yPct=5+Math.random()*90;
+    const rot=-25-Math.random()*20;
+    h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%;transform:translate(-50%,-50%) rotate(${rot}deg)">${esc(text)}</div>`;
   }
   layer.innerHTML=h;
   layer.style.display='block';
 }
 
-/* 页面切换时更新水印（通过监听 DOM 变化） */
-const _wmObserver=new MutationObserver(()=>{updateWatermark();});
-document.querySelectorAll('.page').forEach(p=>{
-  _wmObserver.observe(p,{attributes:true,attributeFilter:['class']});
-});
+/* 页面切换时更新水印 */
+const _origNavigate=navigate;
+navigate=function(name){
+  _origNavigate(name);
+  setTimeout(updateWatermark,50);
+};

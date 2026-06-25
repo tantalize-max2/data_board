@@ -146,10 +146,10 @@
   </div>
 </div>
 
-<!-- 修改密码弹窗 -->
-<div class="modal-mask" id="changePwdMask" onclick="if(event.target===this)closeChangePwdModal()">
+<!-- 修改密码弹窗（首次登录强制，不可关闭） -->
+<div class="modal-mask" id="changePwdMask">
   <div class="modal-box modal-sm">
-    <div class="modal-header"><h3 id="changePwdTitle">修改密码</h3><button class="modal-close" onclick="closeChangePwdModal()">&times;</button></div>
+    <div class="modal-header"><h3 id="changePwdTitle">修改密码</h3><button class="modal-close" id="changePwdCloseBtn" onclick="closeChangePwdModal()">&times;</button></div>
     <div class="modal-body">
       <div id="changePwdAlert" style="display:none;background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.3);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#ffc107">
         首次登录，请修改初始密码后继续使用

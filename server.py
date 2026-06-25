@@ -182,19 +182,15 @@ def validate_strong_password(pwd: str) -> Optional[str]:
 def match_combat_role(user_role_name: str, combat_role: str) -> bool:
     """判断用户的角色名是否包含在作战角色字段中。
     combat_role 格式可能为 'A'、'A+B+C'、'A、B、C' 等。
-    匹配策略：按 + 或 、 分割后，用户角色精确匹配或被包含。
+    匹配策略：按 + 或 、 分割后，用户角色精确匹配或被包含（只允许角色名包含part）。
     """
     if not user_role_name or not combat_role:
         return False
-    # 按 + 或 、 分割，去除空白
     parts = re.split(r'[+、，,]', combat_role)
     parts = [p.strip() for p in parts if p.strip()]
-    # 精确匹配
-    if user_role_name in parts:
-        return True
-    # 模糊匹配：用户角色名是某个 part 的子串，或反过来
     for p in parts:
-        if user_role_name in p or p in user_role_name:
+        # 精确匹配，或角色名是 part 的完整扩展（part 是角色名的子串，但不做反向）
+        if user_role_name == p or p in user_role_name:
             return True
     return False
 
@@ -292,12 +288,18 @@ def get_role_rows(s: dict) -> List[dict]:
             (s.get("zone", ""),))
         return [r for r in rows if has_substantive(r)]
     # 普通人员：查自己的所有角色（主角色 + 额外角色）
+    me = db.query_one("SELECT zone,role_name FROM users WHERE username=%s AND is_active=1", (s["username"],))
+    if not me:
+        return []
+    user_zone = me["zone"]
     user_roles = get_user_all_roles(s["username"])
     if not user_roles:
         return []
 
-    # 1) 作战角色匹配：combat_role 包含自己任一角色的记录
-    all_rows = db.query_all("SELECT * FROM deployment_records ORDER BY sort_order, id")
+    # 只查用户所属战区的记录（战区隔离）
+    all_rows = db.query_all(
+        "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
+        (user_zone,))
     result = []
     seen_ids = set()
     for r in all_rows:
@@ -559,14 +561,26 @@ def overview(request: Request):
         zid = r.get("warzone_id")
         if zid:
             zcount[zid] = zcount.get(zid, 0) + 1
-    # 一次查询所有战区角色，替代 N+1 循环查询
+    # 普通用户和战区管理员只显示自己战区的兵种，管理员显示全部
+    user_zone = None
+    if not s.get("is_admin"):
+        me = db.query_one("SELECT zone FROM users WHERE username=%s AND is_active=1", (s["username"],))
+        if me:
+            user_zone = me["zone"]
+    # 查询兵种角色
     zone_roles_map: Dict[str, List[str]] = {}
-    for u in db.query_all("SELECT zone, role_name FROM users WHERE is_active=1 AND is_admin=0"):
-        zone_roles_map.setdefault(u["zone"], []).append(u["role_name"])
-    for zid, cnt in zcount.items():
+    if user_zone:
+        for u in db.query_all("SELECT zone, role_name FROM users WHERE is_active=1 AND is_admin=0 AND zone=%s", (user_zone,)):
+            zone_roles_map.setdefault(u["zone"], []).append(u["role_name"])
+    else:
+        for u in db.query_all("SELECT zone, role_name FROM users WHERE is_active=1 AND is_admin=0"):
+            zone_roles_map.setdefault(u["zone"], []).append(u["role_name"])
+    # 普通用户只返回本战区，管理员返回全部
+    visible_zones = [user_zone] if user_zone else list(zcount.keys())
+    for zid in visible_zones:
+        cnt = zcount.get(zid, 0)
         w = wl.get(zid)
-        if w:
-            # 去重
+        if w and cnt > 0:
             seen = set()
             roles = [r for r in zone_roles_map.get(zid, []) if not (r in seen or seen.add(r))]
             zone_stats.append({"id": w["id"], "name": w["name"], "color": w["color"],
@@ -1044,20 +1058,33 @@ def admin_get_user_roles(uid: int, request: Request):
         raise HTTPException(403, "只能管理本战区人员")
     extras = db.query_all("SELECT role_name FROM user_extra_roles WHERE username=%s ORDER BY role_name",
                           (user["username"],))
-    # 所有可选角色名（本战区或全局）
+    # 所有可选角色名（按战区分组）
     if zf:
-        all_roles = db.query_all(
-            "SELECT DISTINCT role_name FROM users WHERE is_active=1 AND role_name!='' AND zone=%s ORDER BY role_name",
-            (zf,))
+        raw = db.query_all(
+            "SELECT DISTINCT role_name, zone, zone_name FROM users "
+            "WHERE is_active=1 AND role_name!='' AND zone=%s ORDER BY zone_name, role_name", (zf,))
     else:
-        all_roles = db.query_all(
-            "SELECT DISTINCT role_name FROM users WHERE is_active=1 AND role_name!='' ORDER BY role_name")
+        raw = db.query_all(
+            "SELECT DISTINCT role_name, zone, zone_name FROM users "
+            "WHERE is_active=1 AND role_name!='' ORDER BY zone_name, role_name")
+    # 按 zone 分组
+    zones_map = {}
+    for r in raw:
+        z = r["zone"]
+        if z not in zones_map:
+            zones_map[z] = {"zone": z, "zone_name": r["zone_name"], "roles": []}
+        if r["role_name"] not in zones_map[z]["roles"]:
+            zones_map[z]["roles"].append(r["role_name"])
+    all_roles_grouped = list(zones_map.values())
     return {
         "username": user["username"],
         "name": user["name"],
         "primary_role": user["role_name"],
+        "user_zone": user["zone"],
+        "user_zone_name": user["zone_name"],
         "extra_roles": [r["role_name"] for r in extras],
-        "all_roles": [r["role_name"] for r in all_roles],
+        "all_roles": [r["role_name"] for r in raw],  # 兼容旧格式
+        "all_roles_grouped": all_roles_grouped,
     }
 
 

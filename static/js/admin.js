@@ -13,6 +13,23 @@ let ME=null, IS_ADMIN=false, IS_ZONE_ADMIN=false;
   }catch(e){}
 })();
 
+/* 自定义确认弹窗（替代原生confirm） */
+let _adminConfirmCb=null;
+function showConfirm(msg,cb){
+  const m=document.getElementById('confirmMask');
+  document.getElementById('confirmMsg').textContent=msg;
+  _adminConfirmCb=cb;
+  m.style.display='flex';
+}
+function closeAdminConfirm(){
+  document.getElementById('confirmMask').style.display='none';
+  _adminConfirmCb=null;
+}
+function execAdminConfirm(){
+  closeAdminConfirm();
+  if(_adminConfirmCb){const cb=_adminConfirmCb;_adminConfirmCb=null;cb();}
+}
+
 function backToBoard(){
   location.href='/?token='+encodeURIComponent(TOKEN);
 }
@@ -175,6 +192,7 @@ async function openUserEdit(uid){
   const zones=Object.entries(ZONE_LABEL).filter(([k])=>k!=='all');
   /* 战区指导只能选本战区，锁定下拉框 */
   const zoneLocked=IS_ZONE_ADMIN&&!IS_ADMIN;
+  const canSetPrivilege=IS_ADMIN;  /* 只有全局管理员能设置总经理/战区管理员 */
   const currentZone=zoneLocked?(ME?.zone||''):(u?.zone||'');
   openModal(uid?'编辑人员':'新增人员', `
     <div class="form-grid">
@@ -183,8 +201,8 @@ async function openUserEdit(uid){
       <div class="form-field"><label>手机号 <span class="hint">（用于登录）</span></label><input id="f_phone" value="${esc(u?.phone||u?.username||'')}" placeholder="请输入手机号"></div>
       <div class="form-field"><label>所属战区</label><select id="f_zone" ${zoneLocked?'disabled':''}>${zones.map(([k,v])=>`<option value="${k}"${currentZone===k?' selected':''}>${v}</option>`).join('')}</select></div>
       <div class="form-field"><label>密码 <span class="hint">${uid?'留空不修改':'默认 Xs@2026'}</span></label><input id="f_password" type="password" placeholder="留空不修改"></div>
-      <div class="form-field"><label>战区管理员</label><div class="checkbox-row"><input id="f_zone_admin" type="checkbox" ${u?.is_zone_admin?'checked':''}> <label for="f_zone_admin" style="margin:0">设为战区管理员（可管理本战区人员与内容）</label></div></div>
-      <div class="form-field full"><div class="checkbox-row"><input id="f_admin" type="checkbox" ${u?.is_admin?'checked':''}> <label for="f_admin" style="margin:0">设为总经理（可访问全部数据与管理后台）</label></div></div>
+      ${canSetPrivilege?`<div class="form-field"><label>战区管理员</label><div class="checkbox-row"><input id="f_zone_admin" type="checkbox" ${u?.is_zone_admin?'checked':''}> <label for="f_zone_admin" style="margin:0">设为战区管理员（可管理本战区人员与内容）</label></div></div>`:''}
+      ${canSetPrivilege?`<div class="form-field full"><div class="checkbox-row"><input id="f_admin" type="checkbox" ${u?.is_admin?'checked':''}> <label for="f_admin" style="margin:0">设为总经理（可访问全部数据与管理后台）</label></div></div>`:''}
     </div>`,
     `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveUser(${uid||0})">保存</button>`);
 }
@@ -197,7 +215,7 @@ async function saveUser(uid){
     phone:document.getElementById('f_phone').value.trim(),
     zone:zoneEl.value||zoneEl.querySelector('option[selected]')?.value||ME?.zone||'public',
     password:document.getElementById('f_password').value,
-    is_admin:document.getElementById('f_admin').checked,
+    is_admin:document.getElementById('f_admin')?document.getElementById('f_admin').checked:false,
     is_zone_admin:document.getElementById('f_zone_admin')?document.getElementById('f_zone_admin').checked:false,
   };
   if(!body.name||!body.role_name){toast('姓名与岗位必填','error');return;}
@@ -213,33 +231,47 @@ async function saveUser(uid){
 }
 
 async function stopUser(uid,name){
-  if(!confirm('确认停用「'+name+'」？停用后该账号无法登录。'))return;
-  try{ await api('/api/admin/users/'+uid,{method:'DELETE'}); toast('已停用','success'); fetchUsers(); }
-  catch(e){toast(e.message,'error');}
+  showConfirm('确认停用「'+name+'」？停用后该账号无法登录。',async()=>{
+    try{ await api('/api/admin/users/'+uid,{method:'DELETE'}); toast('已停用','success'); fetchUsers(); }
+    catch(e){toast(e.message||'操作失败','error');}
+  });
 }
 
 async function activateUser(uid,name){
-  if(!confirm('确认启用「'+name+'」？'))return;
-  try{ await api('/api/admin/users/'+uid+'/activate',{method:'PUT'}); toast('已启用','success'); fetchUsers(); }
-  catch(e){toast(e.message,'error');}
+  showConfirm('确认启用「'+name+'」？',async()=>{
+    try{ await api('/api/admin/users/'+uid+'/activate',{method:'PUT'}); toast('已启用','success'); fetchUsers(); }
+    catch(e){toast(e.message||'操作失败','error');}
+  });
 }
 
-/* 赋予额外角色 */
+async function deleteUser(uid,name){
+  showConfirm('确认删除「'+name+'」？此操作不可恢复，将永久删除该人员所有数据！',async()=>{
+    try{ await api('/api/admin/users/'+uid+'?hard=1',{method:'DELETE'}); toast('已删除','success'); fetchUsers(); }
+    catch(e){toast(e.message||'操作失败','error');}
+  });
+}
 async function openUserRoles(uid){
   try{
     const d=await api('/api/admin/user-roles/'+uid);
-    const allRoles=d.all_roles||[];
     const extraSet=new Set(d.extra_roles||[]);
-    openModal('赋予角色 · '+d.name+'（主角色：'+d.primary_role+'）',`
-      <div style="margin-bottom:10px;font-size:13px;color:var(--text-dim)">勾选需要赋予的额外角色，赋予后该用户将拥有这些角色的数据视角：</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:300px;overflow-y:auto">
-        ${allRoles.map(r=>{
-          if(r===d.primary_role)return '';
-          const checked=extraSet.has(r)?'checked':'';
-          return `<label style="display:flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px">
-            <input type="checkbox" class="role-cb" value="${esc(r)}" ${checked}> ${esc(r)}</label>`;
-        }).join('')}
-      </div>`,
+    const grouped=d.all_roles_grouped||[];
+    const userZone=d.user_zone||'';
+    let bodyHtml='<div style="margin-bottom:10px;font-size:13px;color:var(--text-dim)">勾选需要赋予的额外角色，赋予后该用户将拥有这些角色的数据视角：</div>';
+    grouped.forEach(g=>{
+      const isMine=g.zone===userZone;
+      bodyHtml+=`<div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--cyan);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border-hover)">${esc(g.zone_name)}${isMine?' <span style="color:var(--text-dim);font-weight:400">（本战区）</span>':''}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">`;
+      (g.roles||[]).forEach(r=>{
+        if(r===d.primary_role&&isMine){bodyHtml+=`<label style="display:flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border-hover);border-radius:6px;font-size:13px;opacity:.5;cursor:default">
+          <input type="checkbox" checked disabled> ${esc(r)} <span style="font-size:10px;color:var(--text-dim)">主角色</span></label>`;return;}
+        const checked=extraSet.has(r)?'checked':'';
+        bodyHtml+=`<label style="display:flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--border)'">
+          <input type="checkbox" class="role-cb" value="${esc(r)}" ${checked}> ${esc(r)}</label>`;
+      });
+      bodyHtml+='</div></div>';
+    });
+    openModal('赋予角色 · '+d.name+'（'+d.user_zone_name+' · '+d.primary_role+'）',bodyHtml,
       `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveUserRoles(${uid})">保存</button>`);
   }catch(e){toast(e.message,'error');}
 }
@@ -250,12 +282,6 @@ async function saveUserRoles(uid){
     await api('/api/admin/user-roles/'+uid,{method:'PUT',body:{roles}});
     toast('角色已更新','success'); closeModal();
   }catch(e){toast(e.message,'error');}
-}
-
-async function deleteUser(uid,name){
-  if(!confirm('确认删除「'+name+'」？\n\n⚠️ 此操作不可恢复，将永久删除该人员所有数据！'))return;
-  try{ await api('/api/admin/users/'+uid+'?hard=1',{method:'DELETE'}); toast('已删除','success'); fetchUsers(); }
-  catch(e){toast(e.message,'error');}
 }
 
 /* ====== 权限分配 ====== */
