@@ -317,6 +317,7 @@ async function openUserEdit(uid){
       <div class="form-field"><label>所属战区</label><select id="f_zone" onchange="onUserZoneChange(this.value)" ${zoneLocked?'disabled':''}>${zones.map(([k,v])=>`<option value="${k}"${currentZone===k?' selected':''}>${v}</option>`).join('')}</select></div>
       <div class="form-field"><label>密码 <span class="hint">${uid?'留空不修改':'默认 Xs@2026'}</span></label><input id="f_password" type="password" placeholder="留空不修改"></div>
       ${canSetPrivilege?`<div class="form-field"><label>战区管理员</label><div class="checkbox-row"><input id="f_zone_admin" type="checkbox" ${u?.is_zone_admin?'checked':''}> <label for="f_zone_admin" style="margin:0">设为战区管理员（可管理本战区人员与内容）</label></div></div>`:''}
+      ${canSetPrivilege?`<div class="form-field"><label>指导员</label><div class="checkbox-row"><input id="f_guide" type="checkbox" ${u?.is_guide?'checked':''}> <label for="f_guide" style="margin:0">设为指导员（可编辑内容，无管理后台和增删权限）</label></div></div>`:''}
       ${canSetPrivilege?`<div class="form-field full"><div class="checkbox-row"><input id="f_admin" type="checkbox" ${u?.is_admin?'checked':''}> <label for="f_admin" style="margin:0">设为总经理（可访问全部数据与管理后台）</label></div></div>`:''}
     </div>`,
     `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveUser(${uid||0})">保存</button>`);
@@ -346,6 +347,7 @@ async function saveUser(uid){
     password:document.getElementById('f_password').value,
     is_admin:document.getElementById('f_admin')?document.getElementById('f_admin').checked:false,
     is_zone_admin:document.getElementById('f_zone_admin')?document.getElementById('f_zone_admin').checked:false,
+    is_guide:document.getElementById('f_guide')?document.getElementById('f_guide').checked:false,
   };
   if(!body.name||!body.role_name){toast('姓名与岗位必填','error');return;}
   if(!body.phone){toast('手机号必填','error');return;}

@@ -935,13 +935,14 @@ async def admin_create_user(request: Request):
         raise HTTPException(400, f"初始密码不符合规范：{err}")
     h = hashlib.sha256((pwd + salt).encode()).hexdigest()
     is_zone_admin = 1 if body.get("is_zone_admin") else 0
+    is_guide = 1 if body.get("is_guide") else 0
     # 战区管理员不能创建全局管理员
     is_admin = 1 if body.get("is_admin") and not zf else 0
     nid = db.execute(
         "INSERT INTO users(username,name,role_id,role_name,phone,password_hash,password_salt,must_change_pwd,"
-        "zone,zone_name,color,is_admin,is_zone_admin) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        "zone,zone_name,color,is_admin,is_zone_admin,is_guide) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (username, body.get("name") or role_name, username, role_name, username,
-         h, salt, 1, zone, w["name"], w["color"], is_admin, is_zone_admin))
+         h, salt, 1, zone, w["name"], w["color"], is_admin, is_zone_admin, is_guide))
     log_access(s["username"], s.get("name", ""), "create", "user", str(nid),
                json.dumps({"username": username, "name": body.get("name"), "role_name": role_name, "zone": zone}, ensure_ascii=False),
                request)
@@ -982,6 +983,9 @@ async def admin_update_user(uid: int, request: Request):
     zone_name = w["name"] if w else cur["zone_name"]
     color = w["color"] if w else cur["color"]
     role_name = body.get("role_name", cur["role_name"])
+    # 指导员标记：全局管理员和战区管理员都可设置
+    is_guide = 1 if body.get("is_guide") else 0
+    # 有 zf 时战区管理员提升管理员标记有限制
     if body.get("password"):
         err = validate_strong_password(body["password"])
         if err:
@@ -989,16 +993,17 @@ async def admin_update_user(uid: int, request: Request):
         salt = secrets.token_hex(8)
         h = hashlib.sha256((body["password"] + salt).encode()).hexdigest()
         db.execute("UPDATE users SET name=%s,phone=%s,username=%s,role_name=%s,zone=%s,zone_name=%s,color=%s,"
-                   "is_admin=%s,is_zone_admin=%s,password_hash=%s,password_salt=%s,must_change_pwd=1 WHERE id=%s",
+                   "is_admin=%s,is_zone_admin=%s,is_guide=%s,password_hash=%s,password_salt=%s,must_change_pwd=1 WHERE id=%s",
                    (name, phone, phone, role_name, zone, zone_name, color,
-                    is_admin, is_zone_admin, h, salt, uid))
+                    is_admin, is_zone_admin, is_guide, h, salt, uid))
     else:
         db.execute("UPDATE users SET name=%s,phone=%s,username=%s,role_name=%s,zone=%s,zone_name=%s,color=%s,"
-                   "is_admin=%s,is_zone_admin=%s WHERE id=%s",
+                   "is_admin=%s,is_zone_admin=%s,is_guide=%s WHERE id=%s",
                    (name, phone, phone, role_name, zone, zone_name, color,
-                    is_admin, is_zone_admin, uid))
+                    is_admin, is_zone_admin, is_guide, uid))
     log_access(s["username"], s.get("name", ""), "update", "user", str(uid),
-               json.dumps({"name": name, "role_name": role_name, "zone": zone, "is_admin": is_admin, "is_zone_admin": is_zone_admin}, ensure_ascii=False),
+               json.dumps({"name": name, "role_name": role_name, "zone": zone,
+                           "is_admin": is_admin, "is_zone_admin": is_zone_admin, "is_guide": is_guide}, ensure_ascii=False),
                request)
     return {"ok": True}
 
