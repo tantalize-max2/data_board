@@ -1104,12 +1104,12 @@ def admin_get_positions(request: Request):
     if zf:
         rows = db.query_all(
             "SELECT role_name, zone, zone_name, SUM(is_placeholder=0) as cnt FROM users "
-            "WHERE is_active=1 AND role_name!='' AND is_admin=0 AND is_zone_admin=0 AND zone=%s "
+            "WHERE is_active=1 AND role_name!='' AND zone=%s "
             "GROUP BY role_name, zone, zone_name ORDER BY zone_name, role_name", (zf,))
     else:
         rows = db.query_all(
             "SELECT role_name, zone, zone_name, SUM(is_placeholder=0) as cnt FROM users "
-            "WHERE is_active=1 AND role_name!='' AND is_admin=0 AND is_zone_admin=0 "
+            "WHERE is_active=1 AND role_name!='' "
             "GROUP BY role_name, zone, zone_name ORDER BY zone_name, role_name")
     grouped = {}
     for r in rows:

@@ -303,7 +303,9 @@ async function openUserEdit(uid){
     const zg=(posData.grouped||[]).find(g=>g.zone===currentZone);
     if(zg)positions=zg.positions.map(p=>p.role_name);
   }catch(e){}
-  const roleOpts=positions.length?positions:[u?.role_name||''].filter(Boolean);
+  const roleOpts=positions.length>0?positions:[u?.role_name||''].filter(Boolean);
+  /* 确保当前角色在列表中 */
+  if(u?.role_name&&!roleOpts.includes(u.role_name)) roleOpts.unshift(u.role_name);
   openModal(uid?'编辑人员':'新增人员', `
     <div class="form-grid">
       <div class="form-field"><label>姓名</label><input id="f_name" value="${esc(u?.name||'')}"></div>
