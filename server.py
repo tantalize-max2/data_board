@@ -607,11 +607,11 @@ def overview(request: Request):
             # 获取该战区所有兵种名（去重）
             seen = set()
             all_roles = [r for r in zone_roles_map.get(zid, []) if not (r in seen or seen.add(r))]
-            # 只保留在用户可见数据中 combat_role 匹配到的角色（count>0）
-            zone_rows = [r for r in rows if r.get("warzone_id") == zid]
+            # 只保留有匹配数据的兵种（combat_role 匹配）
+            zone_records = [r for r in rows if r.get("warzone_id") == zid]
             visible_roles = []
             for role in all_roles:
-                has_data = any(match_combat_role(role, str(r.get("combat_role", "") or "")) for r in zone_rows)
+                has_data = any(match_combat_role(role, str(r.get("combat_role", "") or "")) for r in zone_records)
                 if has_data:
                     visible_roles.append(role)
             zone_stats.append({"id": w["id"], "name": w["name"], "color": w["color"],
@@ -659,10 +659,10 @@ def search(request: Request, keyword: str = ""):
 
 
 @app.get("/api/role-battles/{role_name}")
-def role_battles(role_name: str, request: Request):
+def role_battles(role_name: str, request: Request, zone: str = ""):
     """查看某角色的战役信息（兵种标签点击）
     根据角色名，查询 combat_role 包含该角色的部署记录，
-    返回战役×战区分布。
+    返回战役×战区分布。zone 参数指定战区（管理员点击非本战区兵种时）。
     """
     s = require_session(request)
     role_name = (role_name or "").strip()
@@ -670,8 +670,10 @@ def role_battles(role_name: str, request: Request):
         raise HTTPException(400, "角色名不能为空")
 
     bl, wl = battle_lookup(), warzone_lookup()
-    # 管理员看所有，战区管理员看本战区，普通用户看自己可见范围
-    if s.get("is_admin"):
+    # 有 zone 参数时按指定战区查询（管理员点击跨战区兵种）
+    if zone:
+        rows = db.query_all("SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order,id", (zone,))
+    elif s.get("is_admin"):
         rows = db.query_all("SELECT * FROM deployment_records ORDER BY sort_order,id")
     elif s.get("is_zone_admin"):
         rows = db.query_all("SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order,id",
@@ -773,8 +775,8 @@ def zone_battles(zone_id: str, request: Request):
 
 
 @app.get("/api/detail/{battle_id}/{zone_id}")
-def cross_detail(battle_id: str, zone_id: str, request: Request):
-    """数据详情：战役+战区交叉过滤"""
+def cross_detail(battle_id: str, zone_id: str, request: Request, role: str = ""):
+    """数据详情：战役+战区交叉过滤。role 参数按作战角色过滤"""
     s = require_session(request)
     rows = get_role_rows(s)
     bl, wl = battle_lookup(), warzone_lookup()
@@ -782,6 +784,9 @@ def cross_detail(battle_id: str, zone_id: str, request: Request):
     if not b or not w:
         raise HTTPException(404, "战役或战区不存在")
     cross = [r for r in rows if r.get("battle_id") == battle_id and r.get("warzone_id") == zone_id]
+    if role:
+        role = role.strip()
+        cross = [r for r in cross if match_combat_role(role, str(r.get("combat_role", "") or ""))]
     return {
         "role": get_user_info(s["username"]),
         "battle": {"id": b["id"], "name": b["name"], "color": b["color"]},
@@ -794,13 +799,16 @@ def cross_detail(battle_id: str, zone_id: str, request: Request):
 
 
 @app.get("/api/path-detail/{battle_id}/{zone_id}/{path_id}")
-def path_detail(battle_id: str, zone_id: str, path_id: str, request: Request):
-    """路径详情：场景列表"""
+def path_detail(battle_id: str, zone_id: str, path_id: str, request: Request, role: str = ""):
+    """路径详情：场景列表。role 参数按作战角色过滤"""
     s = require_session(request)
     rows = get_role_rows(s)
     bl, wl = battle_lookup(), warzone_lookup()
     b, w = bl.get(battle_id), wl.get(zone_id)
     cross = [r for r in rows if r.get("battle_id") == battle_id and r.get("warzone_id") == zone_id]
+    if role:
+        role = role.strip()
+        cross = [r for r in cross if match_combat_role(role, str(r.get("combat_role", "") or ""))]
     path_info = None
     for r in cross:
         if str(r.get("path_no", "") or "").strip() == path_id:

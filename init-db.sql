@@ -144,7 +144,7 @@ INSERT IGNORE INTO battles (id, name, color, sort_order) VALUES
 -- 初始战区数据
 INSERT IGNORE INTO warzones (id, name, color, sort_order) VALUES
 ('public', '公众战区', '#1565c0', 1),
-('business', '商业战区', '#2e7d32', 2),
+('business', '商客战区', '#2e7d32', 2),
 ('education', '校园战区', '#7b1fa2', 3),
 ('industry', '行业战区', '#e65100', 4);
 

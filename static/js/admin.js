@@ -84,7 +84,7 @@ function mapColor(c){
   return m[c]||'#ffffff';
 }
 
-const ZONE_LABEL = {public:'公众战区',business:'商业战区',education:'校园战区',industry:'行业战区',all:'全部战区'};
+const ZONE_LABEL = {public:'公众战区',business:'商客战区',education:'校园战区',industry:'行业战区',all:'全部战区'};
 const ZONE_CLASS = {public:'tag-public',business:'tag-business',education:'tag-education',industry:'tag-industry',all:'tag-admin'};
 let DASHBOARD=null, RECORD_SCHEMA=null;
 
@@ -178,7 +178,7 @@ async function loadUsers(){
       <select id="userZone" class="toolbar-select">
         <option value="">全部战区</option>
         <option value="public"${USERS_STATE.zone==='public'?' selected':''}>公众战区</option>
-        <option value="business"${USERS_STATE.zone==='business'?' selected':''}>商业战区</option>
+        <option value="business"${USERS_STATE.zone==='business'?' selected':''}>商客战区</option>
         <option value="education"${USERS_STATE.zone==='education'?' selected':''}>校园战区</option>
         <option value="industry"${USERS_STATE.zone==='industry'?' selected':''}>行业战区</option>
       </select>

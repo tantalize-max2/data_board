@@ -1,5 +1,5 @@
 /* ====== 夏收行动部署看板 - 前端逻辑 ====== */
-let TOKEN='',ROLE=null;
+let TOKEN='',ROLE=null,ROLE_FILTER='';
 
 /* 检测 token：URL 参数（管理后台返回） > localStorage（持久登录） */
 (async function(){
@@ -46,6 +46,7 @@ function goBack(){
   PAGE_HISTORY.pop();
   const prev=PAGE_HISTORY[PAGE_HISTORY.length-1]||'main';
   showPage(prev);
+  if(prev==='main')ROLE_FILTER='';
 }
 function goMain(){PAGE_HISTORY=[];showPage('main');}
 function openAdmin(){location.href='/admin?token='+encodeURIComponent(TOKEN);}
@@ -139,7 +140,7 @@ function renderTroopOverview(zones){
       /* 管理员/战区管理员可点击所有；普通用户只能点击自己的角色 */
       const canClickThis=isAdmin||isZoneAdmin||isMe;
       const cls='tz-tag'+(isMe?' is-me':'')+(canClickThis?' clickable':'');
-      const click=canClickThis?` onclick="showRoleBattles('${esc(r)}')"`:'';
+      const click=canClickThis?` onclick="showRoleBattles('${esc(r)}','${esc(z.id)}')"`:'';
       const title=canClickThis?('点击查看'+esc(r)+'的战役信息'):'无权限';
       tags+=`<span class="${cls}"${click} title="${title}">${esc(r)}</span>`;
     });
@@ -207,8 +208,9 @@ async function openDetail(bid,zid){
   document.getElementById('detailBreadcrumb').innerHTML='<span class="loading">加载中...</span>';
   document.getElementById('detailInfo').textContent='';
   document.getElementById('detailBody').innerHTML='<div class="loading">加载中...</div>';
+  const roleParam=ROLE_FILTER?'&role='+encodeURIComponent(ROLE_FILTER):'';
   try{
-    const res=await fetch('/api/detail/'+bid+'/'+zid+'?token='+TOKEN);
+    const res=await fetch('/api/detail/'+bid+'/'+zid+'?token='+TOKEN+roleParam);
     if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
     const data=await res.json();
     const bc=document.getElementById('detailBreadcrumb');
@@ -368,8 +370,9 @@ async function openPath(bid,zid,pid){
   document.getElementById('pathBreadcrumb').innerHTML='<span class="loading">加载中...</span>';
   document.getElementById('pathInfo').textContent='';
   document.getElementById('pathBody').innerHTML='<div class="loading">加载中...</div>';
+  const roleParam=ROLE_FILTER?'&role='+encodeURIComponent(ROLE_FILTER):'';
   try{
-    const res=await fetch('/api/path-detail/'+bid+'/'+zid+'/'+encodeURIComponent(pid)+'?token='+TOKEN);
+    const res=await fetch('/api/path-detail/'+bid+'/'+zid+'/'+encodeURIComponent(pid)+'?token='+TOKEN+roleParam);
     if(!res.ok){if(res.status===401){doLogout();return;}throw new Error();}
     const data=await res.json();
     SCENE_CACHE[bid+'|'+zid+'|'+pid]=data;
@@ -740,10 +743,11 @@ function openModal(title, bodyHTML, small){
 function closeModal(){const m=document.getElementById('modalMask');if(m)m.classList.remove('show');}
 
 /* ====== 兵种标签点击查看战役信息 ====== */
-async function showRoleBattles(roleName){
+async function showRoleBattles(roleName,zoneId){
   openModal('「'+roleName+'」 · 战役信息','<div class="empty-state" style="padding:30px">加载中...</div>');
+  const zoneParam=zoneId?'&zone='+encodeURIComponent(zoneId):'';
   try{
-    const res=await fetch('/api/role-battles/'+encodeURIComponent(roleName)+'?token='+TOKEN);
+    const res=await fetch('/api/role-battles/'+encodeURIComponent(roleName)+'?token='+TOKEN+zoneParam);
     if(!res.ok){
       if(res.status===401){doLogout();return;}
       if(res.status===403){const d=await res.json();document.getElementById('modalBody').innerHTML='<div class="empty-state">'+esc(d.detail||'无权查看')+'</div>';return;}
@@ -758,7 +762,9 @@ async function showRoleBattles(roleName){
     h+='<div class="card-grid-3" style="gap:12px">';
     data.battles.forEach(b=>{
       const zoneStr=(b.zones||[]).map(z=>z.name).join('、');
-      h+=`<div class="card-item" onclick="closeModal();openDetail('${b.id}','${(b.zones[0]||{}).id||''}')">
+      /* 如果有zoneId则进入指定战区，否则取第一个 */
+      const gotoZone=zoneId||(b.zones[0]||{}).id||'';
+      h+=`<div class="card-item" onclick="closeModal();ROLE_FILTER='${esc(roleName)}';openDetail('${b.id}','${gotoZone}')">
         <div class="card-name" style="color:${mapBattleColor(b.color)}">${esc(b.name)}</div>
         <div class="card-count">${b.count}条数据 · ${esc(zoneStr)}</div>
         <div class="card-arrow">&#10095;</div></div>`;
