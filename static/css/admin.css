@@ -127,6 +127,12 @@ body>*{position:relative;z-index:1}
 .toolbar-select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-glow)}
 .toolbar-select option{background:var(--bg-dark);color:var(--text-primary)}
 
+/* 角色选择标签（替代optgroup选择器，避免浏览器白条） */
+.role-tag{padding:5px 10px;border-radius:6px;font-size:13px;cursor:pointer;text-align:center;
+  background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text-primary);transition:all .2s}
+.role-tag:hover{border-color:var(--cyan);background:rgba(0,212,255,.08)}
+.role-tag.role-tag-selected{border-color:var(--cyan);background:rgba(0,212,255,.15);color:var(--cyan);font-weight:700}
+
 /* 表格水平滚动容器（手机端） */
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .table-scroll::-webkit-scrollbar{height:5px}

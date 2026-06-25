@@ -394,9 +394,15 @@ def get_battle_basic(rows: List[dict]) -> Optional[dict]:
         g = str(r.get("guide_role", "") or "").strip()
         c = str(r.get("combat_role", "") or "").strip()
         if g:
-            guide_roles.add(g)
+            for part in re.split(r'[/+、，,;；]', g):
+                part = part.strip()
+                if part:
+                    guide_roles.add(part)
         if c:
-            combat_roles.add(c)
+            for part in re.split(r'[+、，,;；]', c):
+                part = part.strip()
+                if part:
+                    combat_roles.add(part)
     if first is None:
         return None
     return {

@@ -437,23 +437,46 @@ async function loadAccess(){
     ACCESS_STATE.all_roles=data.roles; ACCESS_STATE.roles_grouped=data.roles_grouped||[];
     el.innerHTML=`
       <div class="panel-title">角色权限分配</div>
-      <div class="toolbar" style="gap:10px">
-        <div class="search-box"><select id="accessRole" onchange="selectRole(this.value)">
-          ${buildRoleSelect(ACCESS_STATE.roles_grouped,'')}
-        </select></div>
-        <div class="search-box" style="flex:1">
-          <input type="text" id="accessSearch" placeholder="搜索角色..." oninput="filterRoles(this.value)" style="width:100%;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:6px;color:#fff;padding:6px 12px;font-size:13px">
+      <div class="toolbar" style="gap:10px;flex-wrap:wrap">
+        <div class="search-box" style="flex:1;min-width:200px">
+          <input type="text" id="accessSearch" placeholder="搜索角色..." oninput="filterRoles2(this.value)" style="width:100%;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:6px;color:#fff;padding:6px 12px;font-size:13px">
         </div>
       </div>
-      <div id="accessBox" style="margin-top:12px"><div class="empty">请先选择一个角色</div></div>`;
-    if(ACCESS_STATE.role_id){ document.getElementById('accessRole').value=ACCESS_STATE.role_id; selectRole(ACCESS_STATE.role_id); }
+      <div id="accessRoleList" style="margin-top:10px;max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px"></div>
+      <div id="accessBox" style="margin-top:12px"><div class="empty">选择角色后显示权限矩阵</div></div>`;
+    renderRoleList('');
+    if(ACCESS_STATE.role_id) selectRole(ACCESS_STATE.role_id);
   }catch(e){ el.innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
 }
 
-function filterRoles(q){
-  const sel=document.getElementById('accessRole');
-  sel.innerHTML=buildRoleSelect(ACCESS_STATE.roles_grouped,q);
-  if(ACCESS_STATE.role_id) sel.value=ACCESS_STATE.role_id;
+function renderRoleList(q){
+  const el=document.getElementById('accessRoleList');
+  const grouped=ACCESS_STATE.roles_grouped;
+  let h='';
+  grouped.forEach(g=>{
+    const roles=q?g.roles.filter(r=>r.toLowerCase().includes(q.toLowerCase())):g.roles;
+    if(!roles.length)return;
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--cyan);padding:6px 8px 2px;letter-spacing:1px">${esc(g.zone_name)}</div>`;
+    const cols=Math.min(roles.length,4);
+    h+=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:2px;padding:0 4px 6px">`;
+    roles.forEach(r=>{
+      const sel=r===ACCESS_STATE.role_id?'role-tag-selected':'';
+      h+=`<div class="role-tag ${sel}" onclick="selectRole2('${esc(r)}')">${esc(r)}</div>`;
+    });
+    h+=`</div>`;
+  });
+  el.innerHTML=h||'<div style="padding:20px;text-align:center;color:var(--text-dim)">无匹配角色</div>';
+}
+
+function filterRoles2(q){
+  renderRoleList(q);
+}
+
+function selectRole2(roleId){
+  /* 高亮更新 */
+  document.querySelectorAll('.role-tag').forEach(el=>el.classList.remove('role-tag-selected'));
+  document.querySelectorAll('.role-tag').forEach(el=>{if(el.textContent===roleId)el.classList.add('role-tag-selected');});
+  selectRole(roleId);
 }
 
 async function selectRole(roleId){
