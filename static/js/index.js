@@ -249,19 +249,22 @@ function renderDetailPage(data){
   }
 
   if(data.paths&&data.paths.length){
-    const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
+    const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin)|| (!!ROLE.is_guide);   /* 可编辑（含指导员）*/
+    const canManage=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);                       /* 可增删（不含指导员）*/
     h+=`<div class="module-section"><div class="module-title">路径</div><div class="path-grid">`;
     data.paths.forEach(p=>{
       const ck=data.battle.id+'|'+data.zone.id+'|'+p.path_id;
+      const editBtn=canEdit?`<button class="path-edit-btn" onclick="event.stopPropagation();editPath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}','${esc(p.path_name)}','${esc(p.path_target||'')}')" onmouseenter="event.stopPropagation();hideHoverPreview()" onmouseleave="event.stopPropagation()">编辑</button>`:'';
+      const delBtn=canManage?`<button class="path-del-btn" onclick="event.stopPropagation();deletePath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}','${esc(p.path_name)}')" onmouseenter="event.stopPropagation();hideHoverPreview()" onmouseleave="event.stopPropagation()">删除</button>`:'';
       h+=`<div class="path-card" onclick="openPath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}')" onmouseenter="hoverPathScenes(event,'${ck}','${esc(p.path_name)}')" onmouseleave="hideHoverPreview()">
         <div class="path-name">${esc(p.path_name)}</div>
         <div class="path-target">${p.path_target?esc(p.path_target):'暂无路径目标'}</div>
         <div class="path-meta"><span class="path-id">编号 ${esc(p.path_id)}</span><span class="path-scenes">${p.scene_count}个场景</span></div>
-        ${canEdit?`<div class="path-actions"><button class="path-edit-btn" onclick="event.stopPropagation();editPath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}','${esc(p.path_name)}','${esc(p.path_target||'')}')" onmouseenter="event.stopPropagation();hideHoverPreview()" onmouseleave="event.stopPropagation()">编辑</button><button class="path-del-btn" onclick="event.stopPropagation();deletePath('${data.battle.id}','${data.zone.id}','${esc(p.path_id)}','${esc(p.path_name)}')" onmouseenter="event.stopPropagation();hideHoverPreview()" onmouseleave="event.stopPropagation()">删除</button></div>`:''}
+        ${(editBtn||delBtn)?`<div class="path-actions">${editBtn}${delBtn}</div>`:''}
         <span class="path-arrow">&#10095;</span></div>`;
     });
     h+=`</div>`;
-    if(canEdit){
+    if(canManage){
       h+=`<button class="add-path-btn" onclick="addPath('${data.battle.id}','${data.zone.id}','${esc(data.battle.name)}','${esc(data.zone.name)}')">+ 新增路径</button>`;
     }
     h+=`</div>`;
@@ -396,14 +399,14 @@ function renderPathPage(data){
   h+=`</div></div></div>`;
 
   if(data.scenes&&data.scenes.length){
-    const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
+    const canManage=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);   /* 可增删场景（不含指导员）*/
     h+=`<div class="module-section"><div class="module-title">场景</div><div class="scene-grid">`;
     const ck=data.battle.id+'|'+data.zone.id+'|'+(data.path?.path_id||'');
     data.scenes.forEach((s,idx)=>{
       const sceneTitle=s['场景名称']||s['场景（对到话术、作战角色）']||'未命名场景';
       const guide=s['指导角色（营销统筹/专员）']||'',combat=s['作战角色']||'';
       const source=s['商机来源']||'',cycle=s['最短管控周期']||'';
-      const delBtn=canEdit&&s.id?`<button class="scene-del-btn" onclick="event.stopPropagation();deleteScene(${s.id},'${ck}','${esc(sceneTitle)}')" onmouseenter="event.stopPropagation();hideHoverPreview()" onmouseleave="event.stopPropagation()">删除</button>`:'';
+      const delBtn=canManage&&s.id?`<button class="scene-del-btn" onclick="event.stopPropagation();deleteScene(${s.id},'${ck}','${esc(sceneTitle)}')" onmouseenter="event.stopPropagation();hideHoverPreview()" onmouseleave="event.stopPropagation()">删除</button>`:'';
       h+=`<div class="scene-module" onclick="openScene('${ck}',${idx})" onmouseenter="hoverSceneInfo(event,'${ck}',${idx})" onmouseleave="hideHoverPreview()">
         <div class="sm-header"><span class="sm-id">${esc(s['场景编号']||'')}</span><span class="sm-name">${esc(sceneTitle)}</span></div>
         <div class="sm-fields">
@@ -416,14 +419,14 @@ function renderPathPage(data){
       </div>`;
     });
     h+=`</div>`;
-    if(canEdit){
+    if(canManage){
       h+=`<button class="add-path-btn" onclick="addScene('${data.battle.id}','${data.zone.id}','${esc(data.path?.path_id||'')}','${esc(data.battle?.name||'')}','${esc(data.zone?.name||'')}','${esc(data.path?.path_name||'')}')">+ 新增场景</button>`;
     }
     h+=`</div>`;
   }else{
-    const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
+    const canManage=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
     h+='<div class="empty-state">该路径暂无场景数据</div>';
-    if(canEdit){
+    if(canManage){
       h+=`<button class="add-path-btn" onclick="addScene('${data.battle.id}','${data.zone.id}','${esc(data.path?.path_id||'')}','${esc(data.battle?.name||'')}','${esc(data.zone?.name||'')}','${esc(data.path?.path_name||'')}')">+ 新增场景</button>`;
     }
   }
@@ -518,7 +521,7 @@ function renderSceneDetail(data,s,sceneTitle){
   const el=document.getElementById('sceneBody');let h='';
   const ck=data.battle.id+'|'+data.zone.id+'|'+(data.path?.path_id||'');
   const sceneIdx=(data.scenes||[]).indexOf(s);
-  const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin);
+  const canEdit=(!!ROLE.is_admin)|| (!!ROLE.is_zone_admin)|| (!!ROLE.is_guide);
   const recordId=s['id']||s['ID']||'';
 
   h+=`<div class="module-section"><div class="module-title">场景信息</div><div class="info-card"><div class="card-fields">`;

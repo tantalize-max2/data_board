@@ -131,6 +131,21 @@ def require_zone_admin(request: Request) -> dict:
     raise HTTPException(403, "需要管理权限")
 
 
+def require_edit(request: Request) -> dict:
+    """放行可编辑内容的人员：管理员、战区管理员、指导员。返回 session"""
+    s = require_session(request)
+    if s.get("is_admin") or s.get("is_zone_admin") or s.get("is_guide"):
+        return s
+    raise HTTPException(403, "无编辑权限")
+
+
+def get_zone_filter_edit(s: dict) -> Optional[str]:
+    """编辑权限的战区过滤：管理员返回None(全部)，其余返回自身战区"""
+    if s.get("is_admin"):
+        return None
+    return s.get("zone", "")
+
+
 def get_zone_filter(s: dict) -> Optional[str]:
     """战区指导返回其 zone，总经理返回 None（不限战区）"""
     if s.get("is_admin"):
@@ -142,7 +157,7 @@ def get_zone_filter(s: dict) -> Optional[str]:
 
 def get_user_info(username: str) -> Optional[dict]:
     row = db.query_one(
-        "SELECT username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,must_change_pwd "
+        "SELECT username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,is_guide,must_change_pwd "
         "FROM users WHERE username=%s AND is_active=1", (username,))
     if not row:
         return None
@@ -158,6 +173,7 @@ def get_user_info(username: str) -> Optional[dict]:
         "color": row["color"],
         "is_admin": bool(row["is_admin"]),
         "is_zone_admin": bool(row.get("is_zone_admin", 0)),
+        "is_guide": bool(row.get("is_guide", 0)),
         "must_change_pwd": bool(row.get("must_change_pwd", 0)),
     }
 
@@ -283,6 +299,12 @@ def get_role_rows(s: dict) -> List[dict]:
         return [r for r in rows if has_substantive(r)]
     # 战区管理员：本战区全部数据
     if s.get("is_zone_admin"):
+        rows = db.query_all(
+            "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
+            (s.get("zone", ""),))
+        return [r for r in rows if has_substantive(r)]
+    # 指导员：本战区全部数据（可编辑内容，但无管理后台和增删权限）
+    if s.get("is_guide"):
         rows = db.query_all(
             "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
             (s.get("zone", ""),))
@@ -489,6 +511,7 @@ async def login(request: Request):
         "role_id": user["role_id"],
         "is_admin": bool(user["is_admin"]),
         "is_zone_admin": bool(user.get("is_zone_admin", 0)),
+        "is_guide": bool(user.get("is_guide", 0)),
         "zone": user.get("zone", ""),
         "must_change_pwd": bool(user.get("must_change_pwd", 0)),
         "expire": time.time() + TOKEN_TTL,
@@ -581,10 +604,18 @@ def overview(request: Request):
         cnt = zcount.get(zid, 0)
         w = wl.get(zid)
         if w and cnt > 0:
+            # 获取该战区所有兵种名（去重）
             seen = set()
-            roles = [r for r in zone_roles_map.get(zid, []) if not (r in seen or seen.add(r))]
+            all_roles = [r for r in zone_roles_map.get(zid, []) if not (r in seen or seen.add(r))]
+            # 只保留在用户可见数据中 combat_role 匹配到的角色（count>0）
+            zone_rows = [r for r in rows if r.get("warzone_id") == zid]
+            visible_roles = []
+            for role in all_roles:
+                has_data = any(match_combat_role(role, str(r.get("combat_role", "") or "")) for r in zone_rows)
+                if has_data:
+                    visible_roles.append(role)
             zone_stats.append({"id": w["id"], "name": w["name"], "color": w["color"],
-                               "count": cnt, "roles": roles})
+                               "count": cnt, "roles": visible_roles})
 
     return {"role": get_user_info(s["username"]),
             "my_roles": get_user_all_roles(s["username"]) if not s.get("is_admin") else [],
@@ -1348,8 +1379,8 @@ async def admin_delete_record(rid: int, request: Request):
 @app.put("/api/admin/records/{rid}/field")
 async def admin_update_field(rid: int, request: Request):
     """单字段更新记录。body: {"field": "policy", "value": "新内容"}"""
-    s = require_zone_admin(request)
-    zf = get_zone_filter(s)
+    s = require_edit(request)
+    zf = get_zone_filter_edit(s)
     rec = db.query_one("SELECT id,warzone_id FROM deployment_records WHERE id=%s", (rid,))
     if not rec:
         raise HTTPException(404, "记录不存在")
@@ -1372,8 +1403,8 @@ async def admin_update_path(request: Request):
     """批量更新某路径下所有记录的路径信息。
     body: {"battle_id":"b1","warzone_id":"public","path_no":"1","path_name":"新名称","path_target":"新目标"}
     """
-    s = require_zone_admin(request)
-    zf = get_zone_filter(s)
+    s = require_edit(request)
+    zf = get_zone_filter_edit(s)
     body = await request.json()
     bid = body.get("battle_id", "")
     wid = body.get("warzone_id", "")

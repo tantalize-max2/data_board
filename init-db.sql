@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS users (
   color VARCHAR(20) DEFAULT '#1565c0',
   is_admin TINYINT DEFAULT 0,              -- 全局管理员
   is_zone_admin TINYINT DEFAULT 0,         -- 战区管理员（分局长）
+  is_guide TINYINT DEFAULT 0,              -- 指导员（可编辑内容，无管理后台和增删权限）
   is_active TINYINT DEFAULT 1,
   is_placeholder TINYINT DEFAULT 0,        -- 1=占位人员（岗位管理创建的，非真实用户）
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
