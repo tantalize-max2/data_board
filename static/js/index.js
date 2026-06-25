@@ -1250,14 +1250,13 @@ function updateWatermark(){
   /* 主界面不显示水印 */
   const activePage=document.querySelector('.page.active');
   if(activePage&&activePage.id==='pageMain'){layer.innerHTML='';layer.style.display='none';return;}
-  /* 其他界面显示水印：姓名_电话，20个随机分散 */
+  /* 其他界面显示水印：姓名_电话，15个从左下到右上均匀分配 */
   const text=ROLE.name+'_'+(ROLE.phone||ROLE.username||'');
   let h='';
-  for(let i=0;i<20;i++){
-    const xPct=5+Math.random()*90;
-    const yPct=5+Math.random()*90;
-    const rot=-25-Math.random()*20;
-    h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%;transform:translate(-50%,-50%) rotate(${rot}deg)">${esc(text)}</div>`;
+  for(let i=0;i<15;i++){
+    const xPct=5+(90*i/14);
+    const yPct=92-(84*i/14);
+    h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%">${esc(text)}</div>`;
   }
   layer.innerHTML=h;
   layer.style.display='block';

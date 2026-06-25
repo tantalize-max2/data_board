@@ -10,8 +10,24 @@ let ME=null, IS_ADMIN=false, IS_ZONE_ADMIN=false;
     ME=await api('/api/me');
     IS_ADMIN=!!ME.is_admin;
     IS_ZONE_ADMIN=!!ME.is_zone_admin;
+    initAdminWatermark();
   }catch(e){}
 })();
+
+/* 管理后台水印 */
+function initAdminWatermark(){
+  const layer=document.getElementById('watermarkLayer');
+  if(!layer||!ME||!ME.name)return;
+  const text=ME.name+'_'+(ME.phone||ME.username||'');
+  let h='';
+  for(let i=0;i<15;i++){
+    const xPct=5+(90*i/14);
+    const yPct=92-(84*i/14);
+    h+=`<div class="wm-item" style="left:${xPct}%;top:${yPct}%">${esc(text)}</div>`;
+  }
+  layer.innerHTML=h;
+  layer.style.display='block';
+}
 
 /* 自定义确认弹窗（替代原生confirm） */
 let _adminConfirmCb=null;

@@ -966,17 +966,18 @@ async def admin_delete_user(uid: int, request: Request, hard: int = 0):
     me = db.query_one("SELECT id FROM users WHERE username=%s", (s["username"],))
     if str(uid) == str(me["id"]):
         raise HTTPException(400, "不能删除/停用自己")
-    # 战区指导只能删除本战区人员
-    if zf:
-        target = db.query_one("SELECT zone FROM users WHERE id=%s", (uid,))
-        if not target or target.get("zone") != zf:
-            raise HTTPException(403, "只能删除所属战区的人员")
+    target = db.query_one("SELECT name,zone FROM users WHERE id=%s", (uid,))
+    if not target:
+        raise HTTPException(404, "人员不存在")
+    if zf and target.get("zone") != zf:
+        raise HTTPException(403, "只能删除所属战区的人员")
+    target_name = target.get("name", "")
     if hard:
         db.execute("DELETE FROM users WHERE id=%s", (uid,))
     else:
         db.execute("UPDATE users SET is_active=0 WHERE id=%s", (uid,))
     log_access(s["username"], s.get("name", ""), "delete", "user", str(uid),
-               json.dumps({"hard": hard, "target_name": cur.get("name", "")}, ensure_ascii=False), request)
+               json.dumps({"hard": hard, "target_name": target_name}, ensure_ascii=False), request)
     return {"ok": True}
 
 
