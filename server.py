@@ -132,9 +132,17 @@ def require_zone_admin(request: Request) -> dict:
 
 
 def require_edit(request: Request) -> dict:
-    """放行可编辑内容的人员：管理员、战区管理员、指导员。返回 session"""
+    """放行可编辑内容的人员：管理员、战区管理员、指导员。返回 session
+    同时查数据库确保权限即时生效（无需重新登录）"""
     s = require_session(request)
-    if s.get("is_admin") or s.get("is_zone_admin") or s.get("is_guide"):
+    if s.get("is_admin") or s.get("is_zone_admin"):
+        return s
+    if s.get("is_guide"):
+        return s
+    # 权限即时生效：session 中没有 is_guide，再查数据库确认
+    u = db.query_one("SELECT is_guide FROM users WHERE username=%s AND is_active=1", (s["username"],))
+    if u and u.get("is_guide"):
+        s["is_guide"] = True
         return s
     raise HTTPException(403, "无编辑权限")
 
