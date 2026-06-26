@@ -475,8 +475,9 @@ function renderRoleList(q){
     const cols=Math.min(roles.length,4);
     h+=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:2px;padding:0 4px 6px">`;
     roles.forEach(r=>{
-      const sel=r===ACCESS_STATE.role_id?'role-tag-selected':'';
-      h+=`<div class="role-tag ${sel}" onclick="selectRole2('${esc(r)}')">${esc(r)}</div>`;
+      const sel=r===ACCESS_STATE.role_id?' role-tag-selected':'';
+      const tagId=g.zone+'|'+r;
+      h+=`<div class="role-tag ${sel}" data-tag-id="${esc(tagId)}" onclick="selectRole2('${esc(tagId)}','${esc(r)}')">${esc(r)}</div>`;
     });
     h+=`</div>`;
   });
@@ -487,11 +488,12 @@ function filterRoles2(q){
   renderRoleList(q);
 }
 
-function selectRole2(roleId){
-  /* 高亮更新 */
-  document.querySelectorAll('.role-tag').forEach(el=>el.classList.remove('role-tag-selected'));
-  document.querySelectorAll('.role-tag').forEach(el=>{if(el.textContent===roleId)el.classList.add('role-tag-selected');});
-  selectRole(roleId);
+function selectRole2(tagId,roleName){
+  /* 高亮只取消上次选中的，不影响其他同名角色 */
+  document.querySelectorAll('.role-tag-selected').forEach(el=>el.classList.remove('role-tag-selected'));
+  const tag=document.querySelector(`.role-tag[data-tag-id="${esc(tagId)}"]`);
+  if(tag)tag.classList.add('role-tag-selected');
+  selectRole(roleName);
 }
 
 async function selectRole(roleId){
