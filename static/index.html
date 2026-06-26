@@ -16,7 +16,7 @@
     <h1>百日攻坚"夏收"行动标准化穿透部署</h1>
     <div class="sub"></div>
     <div class="field"><label>手机号</label><input type="text" id="txtPhone" placeholder="请输入手机号" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('txtPwd').focus()"></div>
-    <div class="field"><label>输入密码</label><input type="password" id="txtPwd" placeholder="请输入密码" autocomplete="new-password"></div>
+    <div class="field"><label>输入密码</label><div style="position:relative"><input type="password" id="txtPwd" placeholder="请输入密码" autocomplete="new-password"><span class="pwd-toggle" id="pwdToggle" onclick="togglePwd()">&#128065;</span></div></div>
     <button class="btn" onclick="doLogin()">登 录</button>
     <div class="error" id="loginErr"></div>
   </div>
@@ -156,11 +156,11 @@
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
         <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">旧密码</label>
-          <input type="password" class="prompt-input" id="oldPwd" placeholder="请输入旧密码"></div>
-        <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">新密码 <span style="color:var(--text-dim);font-size:11px">(至少8位，含大小写字母+数字+特殊符号)</span></label>
-          <input type="password" class="prompt-input" id="newPwd" placeholder="请输入新密码"></div>
+          <div style="position:relative"><input type="password" class="prompt-input" id="oldPwd" placeholder="请输入旧密码" style="padding-right:36px"><span class="pwd-toggle-inline" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password';this.style.opacity=this.previousElementSibling.type==='password'?.5:1">&#128065;</span></div></div>
+        <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">新密码 <span style="color:var(--text-dim);font-size:11px">(至少7位，含大小写字母+数字+特殊符号)</span></label>
+          <div style="position:relative"><input type="password" class="prompt-input" id="newPwd" placeholder="请输入新密码" style="padding-right:36px"><span class="pwd-toggle-inline" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password';this.style.opacity=this.previousElementSibling.type==='password'?.5:1">&#128065;</span></div></div>
         <div><label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px">确认新密码</label>
-          <input type="password" class="prompt-input" id="newPwd2" placeholder="请再次输入新密码"></div>
+          <div style="position:relative"><input type="password" class="prompt-input" id="newPwd2" placeholder="请再次输入新密码" style="padding-right:36px"><span class="pwd-toggle-inline" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password';this.style.opacity=this.previousElementSibling.type==='password'?.5:1">&#128065;</span></div></div>
       </div>
     </div>
     <div class="modal-footer">

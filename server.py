@@ -163,6 +163,23 @@ def get_zone_filter(s: dict) -> Optional[str]:
     return None
 
 
+def get_zone_filter_list(s: dict) -> Optional[List[str]]:
+    """战区管理员返回其可管理的所有战区（本角色+额外角色所属战区），
+    总经理返回 None（不限战区）"""
+    if s.get("is_admin"):
+        return None
+    zones = [s.get("zone", "")] if s.get("zone") else []
+    if zones:
+        extra = db.query_all(
+            "SELECT DISTINCT zone FROM user_extra_roles WHERE username=%s AND zone!=''",
+            (s["username"],))
+        for e in extra:
+            z = e["zone"]
+            if z and z not in zones:
+                zones.append(z)
+    return zones if zones else None
+
+
 def get_user_info(username: str) -> Optional[dict]:
     row = db.query_one(
         "SELECT username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,is_guide,must_change_pwd "
@@ -188,9 +205,9 @@ def get_user_info(username: str) -> Optional[dict]:
 
 # ====== 强密码校验 ======
 def validate_strong_password(pwd: str) -> Optional[str]:
-    """校验强密码：>=8位，含大小写字母+数字+特殊符号。返回 None=通过，否则返回错误描述"""
-    if len(pwd) < 8:
-        return "密码至少8位"
+    """校验强密码：>=7位，含大小写字母+数字+特殊符号。返回 None=通过，否则返回错误描述"""
+    if len(pwd) < 7:
+        return "密码至少7位"
     if not re.search(r'[A-Z]', pwd):
         return "密码需包含大写字母"
     if not re.search(r'[a-z]', pwd):
@@ -305,17 +322,17 @@ def get_role_rows(s: dict) -> List[dict]:
         sql = "SELECT * FROM deployment_records ORDER BY sort_order, id"
         rows = db.query_all(sql)
         return [r for r in rows if has_substantive(r)]
-    # 战区管理员：本战区全部数据
-    if s.get("is_zone_admin"):
+    # 战区管理员/指导员：本战区全部数据 + 额外角色所属战区数据
+    if s.get("is_zone_admin") or s.get("is_guide"):
+        base_zone = s.get("zone", "")
+        extra_zones = db.query_all(
+            "SELECT DISTINCT zone FROM user_extra_roles WHERE username=%s AND zone!=''",
+            (s["username"],))
+        all_zones = [base_zone] + [ez["zone"] for ez in extra_zones if ez["zone"] != base_zone]
+        placeholders = ",".join(["%s"] * len(all_zones))
         rows = db.query_all(
-            "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
-            (s.get("zone", ""),))
-        return [r for r in rows if has_substantive(r)]
-    # 指导员：本战区全部数据（可编辑内容，但无管理后台和增删权限）
-    if s.get("is_guide"):
-        rows = db.query_all(
-            "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
-            (s.get("zone", ""),))
+            f"SELECT * FROM deployment_records WHERE warzone_id IN ({placeholders}) ORDER BY sort_order, id",
+            all_zones)
         return [r for r in rows if has_substantive(r)]
     # 普通人员：查自己的所有角色（主角色 + 额外角色）
     me = db.query_one("SELECT zone,role_name FROM users WHERE username=%s AND is_active=1", (s["username"],))
@@ -326,10 +343,15 @@ def get_role_rows(s: dict) -> List[dict]:
     if not user_roles:
         return []
 
-    # 只查用户所属战区的记录（战区隔离）
+    # 查询额外角色所属的战区，加入可见战区列表
+    extra_zones = db.query_all(
+        "SELECT DISTINCT zone FROM user_extra_roles WHERE username=%s AND zone!=''",
+        (s["username"],))
+    all_zones = [user_zone] + [ez["zone"] for ez in extra_zones if ez["zone"] != user_zone]
+    placeholders = ",".join(["%s"] * len(all_zones))
     all_rows = db.query_all(
-        "SELECT * FROM deployment_records WHERE warzone_id=%s ORDER BY sort_order, id",
-        (user_zone,))
+        f"SELECT * FROM deployment_records WHERE warzone_id IN ({placeholders}) ORDER BY sort_order, id",
+        all_zones)
     result = []
     seen_ids = set()
     for r in all_rows:
@@ -600,20 +622,35 @@ def overview(request: Request):
             zcount[zid] = zcount.get(zid, 0) + 1
     # 普通用户和战区管理员只显示自己战区的兵种，管理员显示全部
     user_zone = None
+    extra_user_zones = []  # 额外角色带来的额外战区
     if not s.get("is_admin"):
         me = db.query_one("SELECT zone FROM users WHERE username=%s AND is_active=1", (s["username"],))
         if me:
             user_zone = me["zone"]
+            ez = db.query_all(
+                "SELECT DISTINCT zone FROM user_extra_roles WHERE username=%s AND zone!=''",
+                (s["username"],))
+            extra_user_zones = [e["zone"] for e in ez if e["zone"] != user_zone]
     # 查询兵种角色（过滤空 role_name）
     zone_roles_map: Dict[str, List[str]] = {}
-    if user_zone:
-        for u in db.query_all("SELECT zone, role_name FROM users WHERE is_active=1 AND is_admin=0 AND zone=%s AND role_name!=''", (user_zone,)):
-            zone_roles_map.setdefault(u["zone"], []).append(u["role_name"])
+    query_zones = [user_zone] + extra_user_zones if user_zone else None
+    if query_zones:
+        for z in query_zones:
+            for u in db.query_all("SELECT role_name FROM users WHERE is_active=1 AND is_admin=0 AND zone=%s AND role_name!=''", (z,)):
+                zone_roles_map.setdefault(z, []).append(u["role_name"])
     else:
         for u in db.query_all("SELECT zone, role_name FROM users WHERE is_active=1 AND is_admin=0 AND role_name!=''"):
             zone_roles_map.setdefault(u["zone"], []).append(u["role_name"])
-    # 普通用户只返回本战区，管理员返回全部
-    visible_zones = [user_zone] if user_zone else list(zcount.keys())
+    # 把用户已赋予的额外角色也加入所属战区的兵种列表
+    if user_zone:
+        extra_roles = db.query_all(
+            "SELECT role_name FROM user_extra_roles WHERE username=%s AND role_name!=''",
+            (s["username"],))
+        for er in extra_roles:
+            if er["role_name"] not in zone_roles_map.get(user_zone, []):
+                zone_roles_map.setdefault(user_zone, []).append(er["role_name"])
+    # 普通用户返回本战区+额外战区，管理员返回全部
+    visible_zones = [user_zone] + extra_user_zones if user_zone else list(zcount.keys())
     for zid in visible_zones:
         cnt = zcount.get(zid, 0)
         w = wl.get(zid)
@@ -1237,7 +1274,7 @@ def admin_get_user_roles(uid: int, request: Request):
         raise HTTPException(404, "人员不存在")
     if zf and user["zone"] != zf:
         raise HTTPException(403, "只能管理本战区人员")
-    extras = db.query_all("SELECT role_name FROM user_extra_roles WHERE username=%s ORDER BY role_name",
+    extras = db.query_all("SELECT role_name, zone FROM user_extra_roles WHERE username=%s ORDER BY role_name",
                           (user["username"],))
     # 所有可选角色名（按战区分组）
     if zf:
@@ -1263,7 +1300,7 @@ def admin_get_user_roles(uid: int, request: Request):
         "primary_role": user["role_name"],
         "user_zone": user["zone"],
         "user_zone_name": user["zone_name"],
-        "extra_roles": [r["role_name"] for r in extras],
+        "extra_roles": [{"role_name": r["role_name"], "zone": r.get("zone", "")} for r in extras],
         "all_roles": [r["role_name"] for r in raw],  # 兼容旧格式
         "all_roles_grouped": all_roles_grouped,
     }
@@ -1280,20 +1317,24 @@ async def admin_set_user_roles(uid: int, request: Request):
     if zf and user["zone"] != zf:
         raise HTTPException(403, "只能管理本战区人员")
     body = await request.json()
-    roles = body.get("roles", [])
+    roles = body.get("roles", [])  # [{role_name, zone}, ...]
     username = user["username"]
     db.execute("DELETE FROM user_extra_roles WHERE username=%s", (username,))
     if roles:
-        valid_roles = set()
-        if zf:
-            rows = db.query_all("SELECT DISTINCT role_name FROM users WHERE is_active=1 AND zone=%s", (zf,))
-        else:
-            rows = db.query_all("SELECT DISTINCT role_name FROM users WHERE is_active=1")
-        valid_roles = {r["role_name"] for r in rows if r["role_name"]}
-        clean = [r for r in roles if r in valid_roles and r != user["role_name"]]
+        # 构建 zone+role_name 的有效集合
+        valid_pairs = set()
+        rows = db.query_all("SELECT DISTINCT role_name, zone FROM users WHERE is_active=1 AND role_name!=''")
+        for vr in rows:
+            valid_pairs.add((vr["zone"], vr["role_name"]))
+        clean = []
+        for item in roles:
+            rn = item.get("role_name", "").strip()
+            z = item.get("zone", "").strip()
+            if rn and rn != user["role_name"] and (z, rn) in valid_pairs:
+                clean.append((username, rn, z))
         if clean:
-            db.executemany("INSERT IGNORE INTO user_extra_roles(username,role_name) VALUES(%s,%s)",
-                           [(username, r) for r in clean])
+            db.executemany("INSERT IGNORE INTO user_extra_roles(username,role_name,zone) VALUES(%s,%s,%s)",
+                           clean)
     log_access(s["username"], s.get("name", ""), "update", "user_roles", username,
                json.dumps({"extra_roles": roles}, ensure_ascii=False), request)
     return {"ok": True}
@@ -1330,14 +1371,15 @@ def admin_record_schema(request: Request):
 def admin_records(request: Request, battle_id: str = "", zone_id: str = ""):
     """记录列表（支持战役/战区筛选）"""
     s = require_zone_admin(request)
-    zf = get_zone_filter(s)
+    zfl = get_zone_filter_list(s)
     sql = "SELECT * FROM deployment_records WHERE 1=1"
     args = []
-    if zf:
-        sql += " AND warzone_id=%s"; args.append(zf)
+    if zfl:
+        placeholders = ",".join(["%s"] * len(zfl))
+        sql += f" AND warzone_id IN ({placeholders})"; args.extend(zfl)
     if battle_id:
         sql += " AND battle_id=%s"; args.append(battle_id)
-    if zone_id and not zf:
+    if zone_id and not zfl:
         sql += " AND warzone_id=%s"; args.append(zone_id)
     sql += " ORDER BY battle_id, warzone_id, sort_order, id"
     rows = db.query_all(sql, args)
@@ -1393,11 +1435,11 @@ async def admin_update_record(rid: int, request: Request):
 @app.delete("/api/admin/records/{rid}")
 async def admin_delete_record(rid: int, request: Request):
     s = require_zone_admin(request)
-    zf = get_zone_filter(s)
+    zfl = get_zone_filter_list(s)
     rec = db.query_one("SELECT id,warzone_id FROM deployment_records WHERE id=%s", (rid,))
     if not rec:
         raise HTTPException(404, "记录不存在")
-    if zf and rec["warzone_id"] != zf:
+    if zfl and rec["warzone_id"] not in zfl:
         raise HTTPException(403, "只能管理本战区的记录")
     db.execute("DELETE FROM deployment_records WHERE id=%s", (rid,))
     return {"ok": True}
@@ -1407,11 +1449,11 @@ async def admin_delete_record(rid: int, request: Request):
 async def admin_update_field(rid: int, request: Request):
     """单字段更新记录。body: {"field": "policy", "value": "新内容"}"""
     s = require_edit(request)
-    zf = get_zone_filter_edit(s)
+    zfl = get_zone_filter_list(s)
     rec = db.query_one("SELECT id,warzone_id FROM deployment_records WHERE id=%s", (rid,))
     if not rec:
         raise HTTPException(404, "记录不存在")
-    if zf and rec["warzone_id"] != zf:
+    if zfl and rec["warzone_id"] not in zfl:
         raise HTTPException(403, "只能管理本战区的记录")
     body = await request.json()
     field = body.get("field", "").strip()
@@ -1431,12 +1473,12 @@ async def admin_update_path(request: Request):
     body: {"battle_id":"b1","warzone_id":"public","path_no":"1","path_name":"新名称","path_target":"新目标"}
     """
     s = require_edit(request)
-    zf = get_zone_filter_edit(s)
+    zfl = get_zone_filter_list(s)
     body = await request.json()
     bid = body.get("battle_id", "")
     wid = body.get("warzone_id", "")
     pno = body.get("path_no", "")
-    if zf and wid != zf:
+    if zfl and wid not in zfl:
         raise HTTPException(403, "只能管理本战区的记录")
     updates = {}
     if body.get("path_name") is not None:
@@ -1499,10 +1541,10 @@ def admin_next_no(request: Request, bid: str, zid: str, pno: str = ""):
 async def admin_delete_path(request: Request):
     """删除整条路径及其下所有场景"""
     s = require_zone_admin(request)
-    zf = get_zone_filter(s)
+    zfl = get_zone_filter_list(s)
     body = await request.json()
     bid, wid, pno = body.get("battle_id", ""), body.get("warzone_id", ""), body.get("path_no", "")
-    if zf and wid != zf:
+    if zfl and wid not in zfl:
         raise HTTPException(403, "只能管理本战区的记录")
     n = db.execute(
         "DELETE FROM deployment_records WHERE battle_id=%s AND warzone_id=%s AND path_no=%s",

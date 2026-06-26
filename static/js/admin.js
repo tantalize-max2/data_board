@@ -5,6 +5,13 @@ if(!TOKEN){ location.href='/'; }
 
 /* 当前用户信息（启动时加载） */
 let ME=null, IS_ADMIN=false, IS_ZONE_ADMIN=false;
+
+/* 权限等级：3=管理员 2=战区管理员 1=指导员 0=普通 */
+function userLevel(u){return u.is_admin?3:u.is_zone_admin?2:u.is_guide?1:0;}
+function canEditUser(target){
+  if(!target||target.username===ME?.username)return true;
+  return userLevel(ME)>userLevel(target);
+}
 (async()=>{
   try{
     ME=await api('/api/me');
@@ -274,10 +281,10 @@ async function fetchUsers(){
               <td>${u.is_admin?'<span class="tag tag-admin">管理员</span>':u.is_zone_admin?'<span class="tag" style="background:rgba(0,212,255,.15);color:var(--cyan)">战区管理员</span>':'<span style="color:var(--text-dim)">普通</span>'}</td>
               <td>${u.is_active?'<span class="tag tag-active">在用</span>':'<span class="tag tag-stopped">停用</span>'}</td>
               <td>
-                <button class="btn btn-ghost btn-sm" onclick="openUserEdit(${u.id})">编辑</button>
-                ${u.is_active?`<button class="btn btn-danger btn-sm" onclick="stopUser(${u.id},'${esc(u.name)}')">停用</button>`:`<button class="btn btn-primary btn-sm" onclick="activateUser(${u.id},'${esc(u.name)}')">启用</button>`}
-                <button class="btn btn-ghost btn-sm" onclick="openUserRoles(${u.id})" title="赋予额外角色">角色</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${esc(u.name)}')">删除</button>
+                ${canEditUser(u)?`<button class="btn btn-ghost btn-sm" onclick="openUserEdit(${u.id})">编辑</button>`:`<button class="btn btn-ghost btn-sm" disabled style="opacity:.3;cursor:not-allowed">编辑</button>`}
+                ${u.is_active?`<button class="btn btn-danger btn-sm" ${canEditUser(u)?`onclick="stopUser(${u.id},'${esc(u.name)}')"`:'disabled style="opacity:.3;cursor:not-allowed"'}>停用</button>`:`<button class="btn btn-primary btn-sm" ${canEditUser(u)?`onclick="activateUser(${u.id},'${esc(u.name)}')"`:'disabled style="opacity:.3;cursor:not-allowed"'}>启用</button>`}
+                ${canEditUser(u)?`<button class="btn btn-ghost btn-sm" onclick="openUserRoles(${u.id})" title="赋予额外角色">角色</button>`:`<button class="btn btn-ghost btn-sm" disabled style="opacity:.3;cursor:not-allowed">角色</button>`}
+                ${canEditUser(u)?`<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${esc(u.name)}')">删除</button>`:`<button class="btn btn-danger btn-sm" disabled style="opacity:.3;cursor:not-allowed">删除</button>`}
               </td>
             </tr>`).join('')}
           </tbody>
@@ -292,10 +299,13 @@ async function openUserEdit(uid){
     const all=await api('/api/admin/users');
     u=all.users.find(x=>x.id===uid);
     if(!u){toast('人员不存在','error');return;}
+    if(!canEditUser(u)){toast('无权限编辑同级或更高级人员','error');return;}
   }
   const zones=Object.entries(ZONE_LABEL).filter(([k])=>k!=='all');
   const zoneLocked=IS_ZONE_ADMIN&&!IS_ADMIN;
-  const canSetPrivilege=IS_ADMIN;
+  const canSetAdmin=IS_ADMIN;                     /* 总经理 */
+  const canSetZoneAdmin=IS_ADMIN;                 /* 战区管理员 */
+  const canSetGuide=IS_ADMIN||IS_ZONE_ADMIN;      /* 指导员 - 战区管理员也可设置 */
   const currentZone=zoneLocked?(ME?.zone||''):(u?.zone||'business');
   /* 获取本战区岗位列表 */
   let positions=[];
@@ -317,9 +327,9 @@ async function openUserEdit(uid){
       <div class="form-field"><label>手机号 <span class="hint">（用于登录）</span></label><input id="f_phone" value="${esc(u?.phone||u?.username||'')}" placeholder="请输入手机号"></div>
       <div class="form-field"><label>所属战区</label><select id="f_zone" onchange="onUserZoneChange(this.value)" ${zoneLocked?'disabled':''}>${zones.map(([k,v])=>`<option value="${k}"${currentZone===k?' selected':''}>${v}</option>`).join('')}</select></div>
       <div class="form-field"><label>密码 <span class="hint">${uid?'留空不修改':'默认 Xs@2026'}</span></label><input id="f_password" type="password" placeholder="留空不修改"></div>
-      ${canSetPrivilege?`<div class="form-field"><label>战区管理员</label><div class="checkbox-row"><input id="f_zone_admin" type="checkbox" ${u?.is_zone_admin?'checked':''}> <label for="f_zone_admin" style="margin:0">设为战区管理员（可管理本战区人员与内容）</label></div></div>`:''}
-      ${canSetPrivilege?`<div class="form-field"><label>指导员</label><div class="checkbox-row"><input id="f_guide" type="checkbox" ${u?.is_guide?'checked':''}> <label for="f_guide" style="margin:0">设为指导员（可编辑内容，无管理后台和增删权限）</label></div></div>`:''}
-      ${canSetPrivilege?`<div class="form-field full"><div class="checkbox-row"><input id="f_admin" type="checkbox" ${u?.is_admin?'checked':''}> <label for="f_admin" style="margin:0">设为总经理（可访问全部数据与管理后台）</label></div></div>`:''}
+      ${canSetAdmin?`<div class="form-field full"><div class="checkbox-row"><input id="f_admin" type="checkbox" ${u?.is_admin?'checked':''}> <label for="f_admin" style="margin:0">设为总经理（可访问全部数据与管理后台）</label></div></div>`:''}
+      ${canSetZoneAdmin?`<div class="form-field"><label>战区管理员</label><div class="checkbox-row"><input id="f_zone_admin" type="checkbox" ${u?.is_zone_admin?'checked':''}> <label for="f_zone_admin" style="margin:0">设为战区管理员（可管理本战区人员与内容）</label></div></div>`:''}
+      ${canSetGuide?`<div class="form-field"><label>指导员</label><div class="checkbox-row"><input id="f_guide" type="checkbox" ${u?.is_guide?'checked':''}> <label for="f_guide" style="margin:0">设为指导员（可编辑内容，无管理后台和增删权限）</label></div></div>`:''}
     </div>`,
     `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveUser(${uid||0})">保存</button>`);
 }
@@ -385,10 +395,11 @@ async function deleteUser(uid,name){
 async function openUserRoles(uid){
   try{
     const d=await api('/api/admin/user-roles/'+uid);
-    const extraSet=new Set(d.extra_roles||[]);
     const grouped=d.all_roles_grouped||[];
     const userZone=d.user_zone||'';
     let bodyHtml='<div style="margin-bottom:10px;font-size:13px;color:var(--text-dim)">勾选需要赋予的额外角色，赋予后该用户将拥有这些角色的数据视角：</div>';
+    const extraSet=new Map();  /* key=zone|role_name */
+    (d.extra_roles||[]).forEach(r=>extraSet.set((r.zone||'')+'|'+r.role_name,true));
     grouped.forEach(g=>{
       const isMine=g.zone===userZone;
       bodyHtml+=`<div style="margin-bottom:14px">
@@ -397,9 +408,10 @@ async function openUserRoles(uid){
       (g.roles||[]).forEach(r=>{
         if(r===d.primary_role&&isMine){bodyHtml+=`<label style="display:flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border-hover);border-radius:6px;font-size:13px;opacity:.5;cursor:default">
           <input type="checkbox" checked disabled> ${esc(r)} <span style="font-size:10px;color:var(--text-dim)">主角色</span></label>`;return;}
-        const checked=extraSet.has(r)?'checked':'';
+        const key=g.zone+'|'+r;
+        const checked=extraSet.has(key)?'checked':'';
         bodyHtml+=`<label style="display:flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--border)'">
-          <input type="checkbox" class="role-cb" value="${esc(r)}" ${checked}> ${esc(r)}</label>`;
+          <input type="checkbox" class="role-cb" data-zone="${esc(g.zone)}" data-role="${esc(r)}" ${checked}> ${esc(r)}</label>`;
       });
       bodyHtml+='</div></div>';
     });
@@ -409,7 +421,7 @@ async function openUserRoles(uid){
 }
 
 async function saveUserRoles(uid){
-  const roles=[...document.querySelectorAll('.role-cb:checked')].map(cb=>cb.value);
+  const roles=[...document.querySelectorAll('.role-cb:checked')].map(cb=>({role_name:cb.dataset.role,zone:cb.dataset.zone}));
   try{
     await api('/api/admin/user-roles/'+uid,{method:'PUT',body:{roles}});
     toast('角色已更新','success'); closeModal();

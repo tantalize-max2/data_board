@@ -100,6 +100,14 @@ body>*{position:relative;z-index:1}
   color:#fff;border:none;border-radius:var(--radius);font-size:18px;font-weight:700;cursor:pointer;
   font-family:inherit;letter-spacing:12px;transition:all .3s;position:relative;overflow:hidden;
   text-shadow:0 1px 2px rgba(0,0,0,.4)}
+
+/* 密码显示/隐藏切换按钮 */
+.pwd-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;
+  font-size:18px;opacity:.5;transition:opacity .2s;user-select:none;z-index:2}
+.pwd-toggle:hover{opacity:1}
+.pwd-toggle-inline{position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;
+  font-size:16px;opacity:.5;transition:opacity .2s;user-select:none;z-index:2}
+.pwd-toggle-inline:hover{opacity:1}
 .login-box .btn::after{content:'';position:absolute;inset:0;
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);
   transform:translateX(-100%);transition:transform .5s}

@@ -60,8 +60,9 @@ CREATE TABLE IF NOT EXISTS user_extra_roles (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(64) NOT NULL,           -- 手机号
   role_name VARCHAR(64) NOT NULL,          -- 额外角色名称
+  zone VARCHAR(32) DEFAULT '',             -- 角色所属战区（区分跨战区同名角色）
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_user_role (username, role_name),
+  UNIQUE KEY uk_user_zone_role (username, zone, role_name),
   INDEX idx_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

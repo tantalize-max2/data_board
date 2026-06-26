@@ -49,6 +49,13 @@ function goBack(){
 function goMain(){PAGE_HISTORY=[];showPage('main');}
 function openAdmin(){sessionStorage.setItem('admin_token',TOKEN);location.href='/admin';}
 
+function togglePwd(){
+  const inp=document.getElementById('txtPwd');
+  const tog=document.getElementById('pwdToggle');
+  if(inp.type==='password'){inp.type='text';tog.style.opacity='1';}
+  else{inp.type='password';tog.style.opacity='.5';}
+}
+
 async function doLogin(){
   const phone=document.getElementById('txtPhone').value.trim();
   const pwd=document.getElementById('txtPwd').value;
@@ -126,16 +133,13 @@ let MY_ROLES=[];
 function renderTroopOverview(zones){
   const isAdmin=!!ROLE.is_admin;
   const isZoneAdmin=!!ROLE.is_zone_admin;
-  const myZone=ROLE.zone;
   let h='';
   zones.forEach(z=>{
     let tags='';
     (z.roles||[]).forEach(r=>{
-      if(!r||!r.trim())return;  /* 过滤空白兵种 */
-      /* 只有自己战区中的角色才可能高亮，其它战区同角色名不高亮 */
-      const isMyZone=z.id===myZone;
-      const isMe=isMyZone&&MY_ROLES.includes(r);
-      /* 管理员/战区管理员可点击所有；普通用户只能点击自己的角色 */
+      if(!r||!r.trim())return;
+      const isMe=MY_ROLES.includes(r);
+      /* 管理员可点击所有；战区管理员可点击所有可见战区的兵种 */
       const canClickThis=isAdmin||isZoneAdmin||isMe;
       const cls='tz-tag'+(isMe?' is-me':'')+(canClickThis?' clickable':'');
       const click=canClickThis?` onclick="showRoleBattles('${esc(r)}','${esc(z.id)}')"`:'';
