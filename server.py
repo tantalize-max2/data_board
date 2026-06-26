@@ -333,6 +333,22 @@ def get_role_rows(s: dict) -> List[dict]:
         rows = db.query_all(
             f"SELECT * FROM deployment_records WHERE warzone_id IN ({placeholders}) ORDER BY sort_order, id",
             all_zones)
+        # 额外战区数据：只保留 combat_role 匹配已赋予角色的
+        if extra_zones:
+            admin_extra_roles = db.query_all(
+                "SELECT role_name FROM user_extra_roles WHERE username=%s",
+                (s["username"],))
+            extra_role_names = [er["role_name"] for er in admin_extra_roles]
+            extra_zone_set = {ez["zone"] for ez in extra_zones}
+            result = []
+            for r in rows:
+                if r.get("warzone_id") == base_zone:
+                    result.append(r)
+                elif r.get("warzone_id") in extra_zone_set:
+                    combat = str(r.get("combat_role", "") or "")
+                    if any(match_combat_role(ern, combat) for ern in extra_role_names):
+                        result.append(r)
+            return [r for r in result if has_substantive(r)]
         return [r for r in rows if has_substantive(r)]
     # 普通人员：查自己的所有角色（主角色 + 额外角色）
     me = db.query_one("SELECT zone,role_name FROM users WHERE username=%s AND is_active=1", (s["username"],))
@@ -935,23 +951,39 @@ def admin_dashboard(request: Request):
 def admin_users(request: Request, q: str = "", zone: str = ""):
     """人员列表（支持关键词 q 与战区过滤）"""
     s = require_zone_admin(request)
-    zf = get_zone_filter(s)
+    zfl = get_zone_filter_list(s)
+    admin_zone = s.get("zone", "")
+    admin_extras = db.query_all(
+        "SELECT role_name FROM user_extra_roles WHERE username=%s",
+        (s["username"],))
+    admin_extra_roles = [ae["role_name"] for ae in admin_extras]
     sql = ("SELECT id,username,name,role_id,role_name,phone,zone,zone_name,color,is_admin,is_zone_admin,is_guide,is_active,must_change_pwd,"
            "created_at FROM users WHERE 1=1")
     args = []
-    # 战区指导只能看本战区人员
-    if zf:
-        sql += " AND zone=%s"; args.append(zf)
+    if zfl:
+        clauses = []
+        for z in zfl:
+            if z == admin_zone:
+                clauses.append("zone=%s"); args.append(z)
+            else:
+                # 额外战区：只显示管理员被赋予的角色
+                if admin_extra_roles:
+                    ph = ",".join(["%s"] * len(admin_extra_roles))
+                    clauses.append(f"(zone=%s AND role_name IN ({ph}))")
+                    args.append(z)
+                    args.extend(admin_extra_roles)
+        if clauses:
+            sql += " AND (" + " OR ".join(clauses) + ")"
     if q:
         sql += " AND (name LIKE %s OR role_name LIKE %s OR phone LIKE %s OR username LIKE %s)"
         kw = f"%{q}%"
         args += [kw, kw, kw, kw]
-    if zone and not zf:
+    if zone and not zfl and zone != 'all':
         sql += " AND zone=%s"
         args.append(zone)
     sql += " ORDER BY is_admin DESC, is_zone_admin DESC, zone, role_name"
     rows = db.query_all(sql, args)
-    return {"total": len(rows), "users": rows, "me": get_user_info(s["username"]), "is_zone_admin": bool(zf)}
+    return {"total": len(rows), "users": rows, "me": get_user_info(s["username"]), "is_zone_admin": bool(zfl)}
 
 
 @app.post("/api/admin/users")
@@ -1081,7 +1113,7 @@ async def admin_delete_user(uid: int, request: Request, hard: int = 0):
 def admin_get_access(request: Request, role_id: str = "", q: str = ""):
     """查询角色权限矩阵。role_id=角色名（如"客户经理"），q=搜索关键词"""
     s = require_zone_admin(request)
-    zf = get_zone_filter(s)
+    zfl = get_zone_filter_list(s)
     battles = db.query_all("SELECT * FROM battles ORDER BY sort_order")
     warzones = db.query_all("SELECT * FROM warzones ORDER BY sort_order")
     if role_id:
@@ -1093,10 +1125,12 @@ def admin_get_access(request: Request, role_id: str = "", q: str = ""):
         if role_id:
             granted.add((r["battle_id"], r["warzone_id"]))
     # 获取所有唯一角色名（按战区分组）
-    if zf:
+    if zfl:
+        placeholders = ",".join(["%s"] * len(zfl))
         raw_roles = db.query_all(
-            "SELECT DISTINCT role_name, zone, zone_name FROM users WHERE is_admin=0 AND is_zone_admin=0 AND is_active=1 "
-            "AND zone=%s AND role_name!='' ORDER BY zone_name, role_name", (zf,))
+            f"SELECT DISTINCT role_name, zone, zone_name FROM users WHERE is_admin=0 AND is_zone_admin=0 AND is_active=1 "
+            f"AND zone IN ({placeholders}) AND role_name!='' ORDER BY zone_name, role_name",
+            zfl)
     else:
         raw_roles = db.query_all(
             "SELECT DISTINCT role_name, zone, zone_name FROM users WHERE is_admin=0 AND is_zone_admin=0 AND is_active=1 "
@@ -1120,7 +1154,7 @@ def admin_get_access(request: Request, role_id: str = "", q: str = ""):
         "roles": roles_flat,
         "roles_grouped": roles_grouped_list,
         "granted": [[g[0], g[1]] for g in granted] if role_id else rules,
-        "zone_filter": zf,
+        "zone_filter": zfl[0] if zfl and len(zfl)==1 else (zfl or None),
     }
 
 
@@ -1128,17 +1162,17 @@ def admin_get_access(request: Request, role_id: str = "", q: str = ""):
 async def admin_set_access(request: Request):
     """批量设置某角色的可见板块（覆盖式）"""
     s = require_zone_admin(request)
-    zf = get_zone_filter(s)
+    zfl = get_zone_filter_list(s)
     body = await request.json()
     role_id = body.get("role_id")
-    grants = body.get("grants", [])  # [{battle_id, warzone_id}, ...]
+    grants = body.get("grants", [])
     if not role_id:
         raise HTTPException(400, "role_id（角色名）必填")
-    # 战区管理员只能修改本战区存在的角色的权限
-    if zf:
+    if zfl:
+        placeholders = ",".join(["%s"] * len(zfl))
         exists = db.query_one(
-            "SELECT id FROM users WHERE role_name=%s AND zone=%s AND is_active=1 LIMIT 1",
-            (role_id, zf))
+            f"SELECT id FROM users WHERE role_name=%s AND zone IN ({placeholders}) AND is_active=1 LIMIT 1",
+            [role_id] + zfl)
         if not exists:
             raise HTTPException(403, "只能分配本战区角色的权限")
     db.execute("DELETE FROM role_access WHERE role_id=%s", (role_id,))
@@ -1276,23 +1310,39 @@ def admin_get_user_roles(uid: int, request: Request):
         raise HTTPException(403, "只能管理本战区人员")
     extras = db.query_all("SELECT role_name, zone FROM user_extra_roles WHERE username=%s ORDER BY role_name",
                           (user["username"],))
-    # 所有可选角色名（按战区分组）
-    if zf:
+    # 所有可选角色名（按战区分组，额外战区只显示管理员被赋予的角色）
+    zfl = get_zone_filter_list(s)
+    if zfl:
+        placeholders = ",".join(["%s"] * len(zfl))
         raw = db.query_all(
-            "SELECT DISTINCT role_name, zone, zone_name FROM users "
-            "WHERE is_active=1 AND role_name!='' AND zone=%s ORDER BY zone_name, role_name", (zf,))
+            f"SELECT DISTINCT role_name, zone, zone_name FROM users "
+            f"WHERE is_active=1 AND role_name!='' AND zone IN ({placeholders}) ORDER BY zone_name, role_name",
+            zfl)
     else:
         raw = db.query_all(
             "SELECT DISTINCT role_name, zone, zone_name FROM users "
             "WHERE is_active=1 AND role_name!='' ORDER BY zone_name, role_name")
-    # 按 zone 分组
+    admin_zone = s.get("zone", "")
+    admin_extras = db.query_all(
+        "SELECT role_name, zone FROM user_extra_roles WHERE username=%s",
+        (s["username"],))
+    admin_extras_set = {(ae["zone"], ae["role_name"]) for ae in admin_extras}
     zones_map = {}
     for r in raw:
-        z = r["zone"]
-        if z not in zones_map:
-            zones_map[z] = {"zone": z, "zone_name": r["zone_name"], "roles": []}
-        if r["role_name"] not in zones_map[z]["roles"]:
-            zones_map[z]["roles"].append(r["role_name"])
+        z = r["zone"]; rn = r["role_name"]
+        if not zfl:
+            # 全球管理员：显示所有战区角色
+            zones_map.setdefault(z, {"zone": z, "zone_name": r["zone_name"], "roles": []})
+            if rn not in zones_map[z]["roles"]:
+                zones_map[z]["roles"].append(rn)
+        elif z == admin_zone:
+            zones_map.setdefault(z, {"zone": z, "zone_name": r["zone_name"], "roles": []})
+            if rn not in zones_map[z]["roles"]:
+                zones_map[z]["roles"].append(rn)
+        elif (z, rn) in admin_extras_set:
+            zones_map.setdefault(z, {"zone": z, "zone_name": r["zone_name"], "roles": []})
+            if rn not in zones_map[z]["roles"]:
+                zones_map[z]["roles"].append(rn)
     all_roles_grouped = list(zones_map.values())
     return {
         "username": user["username"],
@@ -1321,11 +1371,23 @@ async def admin_set_user_roles(uid: int, request: Request):
     username = user["username"]
     db.execute("DELETE FROM user_extra_roles WHERE username=%s", (username,))
     if roles:
-        # 构建 zone+role_name 的有效集合
+        # 验证：本战区所有角色有效；额外战区只允许管理员被赋予的角色
+        zfl = get_zone_filter_list(s)
         valid_pairs = set()
         rows = db.query_all("SELECT DISTINCT role_name, zone FROM users WHERE is_active=1 AND role_name!=''")
         for vr in rows:
-            valid_pairs.add((vr["zone"], vr["role_name"]))
+            z = vr["zone"]; rn = vr["role_name"]
+            if not zfl:
+                # 全球管理员：所有战区角色都有效
+                valid_pairs.add((z, rn))
+            elif z == s.get("zone", ""):
+                valid_pairs.add((z, rn))
+            elif z in zfl:
+                admin_has = db.query_one(
+                    "SELECT id FROM user_extra_roles WHERE username=%s AND role_name=%s AND zone=%s",
+                    (s["username"], rn, z))
+                if admin_has:
+                    valid_pairs.add((z, rn))
         clean = []
         for item in roles:
             rn = item.get("role_name", "").strip()
