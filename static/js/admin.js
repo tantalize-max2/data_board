@@ -429,7 +429,7 @@ async function saveUserRoles(uid){
 }
 
 /* ====== 权限分配 ====== */
-let ACCESS_STATE={role_id:'',battles:[],warzones:[],granted:new Set(),roles:[],roles_grouped:[]};
+let ACCESS_STATE={role_id:'',selected_tag_id:'',battles:[],warzones:[],granted:new Set(),roles:[],roles_grouped:[]};
 
 function buildRoleSelect(grouped,q){
   let opts='<option value="">— 选择角色 —</option>';
@@ -460,6 +460,7 @@ async function loadAccess(){
       <div id="accessRoleList" style="margin-top:10px;max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px"></div>
       <div id="accessBox" style="margin-top:12px"><div class="empty">选择角色后显示权限矩阵</div></div>`;
     renderRoleList('');
+    ACCESS_STATE.selected_tag_id='';
     if(ACCESS_STATE.role_id) selectRole(ACCESS_STATE.role_id);
   }catch(e){ el.innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
 }
@@ -475,8 +476,10 @@ function renderRoleList(q){
     const cols=Math.min(roles.length,4);
     h+=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:2px;padding:0 4px 6px">`;
     roles.forEach(r=>{
-      const sel=r===ACCESS_STATE.role_id?' role-tag-selected':'';
       const tagId=g.zone+'|'+r;
+      const sel=ACCESS_STATE.selected_tag_id
+        ? (tagId===ACCESS_STATE.selected_tag_id?' role-tag-selected':'')
+        : (r===ACCESS_STATE.role_id?' role-tag-selected':'');
       h+=`<div class="role-tag ${sel}" data-tag-id="${esc(tagId)}" onclick="selectRole2('${esc(tagId)}','${esc(r)}')">${esc(r)}</div>`;
     });
     h+=`</div>`;
@@ -489,7 +492,7 @@ function filterRoles2(q){
 }
 
 function selectRole2(tagId,roleName){
-  /* 高亮只取消上次选中的，不影响其他同名角色 */
+  ACCESS_STATE.selected_tag_id=tagId;
   document.querySelectorAll('.role-tag-selected').forEach(el=>el.classList.remove('role-tag-selected'));
   const tag=document.querySelector(`.role-tag[data-tag-id="${esc(tagId)}"]`);
   if(tag)tag.classList.add('role-tag-selected');
