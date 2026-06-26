@@ -133,12 +133,15 @@ let MY_ROLES=[];
 function renderTroopOverview(zones){
   const isAdmin=!!ROLE.is_admin;
   const isZoneAdmin=!!ROLE.is_zone_admin;
+  const myZone=ROLE.zone;
   let h='';
   zones.forEach(z=>{
+    const isMyZone=z.id===myZone;
     let tags='';
     (z.roles||[]).forEach(r=>{
       if(!r||!r.trim())return;
-      const isMe=MY_ROLES.includes(r);
+      /* 本战区不显示高亮（战区管理员自己的战区已有所有角色） */
+      const isMe=isMyZone?false:MY_ROLES.includes(r);
       /* 管理员可点击所有；战区管理员可点击所有可见战区的兵种 */
       const canClickThis=isAdmin||isZoneAdmin||isMe;
       const cls='tz-tag'+(isMe?' is-me':'')+(canClickThis?' clickable':'');
