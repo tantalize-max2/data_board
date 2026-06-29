@@ -147,7 +147,7 @@
 </div>
 
 <!-- 修改密码弹窗（首次登录强制，不可关闭） -->
-<div class="modal-mask" id="changePwdMask">
+<div class="modal-mask" id="changePwdMask" tabindex="-1">
   <div class="modal-box modal-sm">
     <div class="modal-header"><h3 id="changePwdTitle">修改密码</h3><button class="modal-close" id="changePwdCloseBtn" onclick="closeChangePwdModal()">&times;</button></div>
     <div class="modal-body">
@@ -166,6 +166,7 @@
     <div class="modal-footer">
       <button class="modal-btn modal-btn-no" id="changePwdCancel" onclick="closeChangePwdModal()">取消</button>
       <button class="modal-btn modal-btn-ok" onclick="doChangePwd()">确认修改</button>
+      <span class="modal-link" id="changePwdLogout" onclick="doChangePwdLogout()" style="display:none;cursor:pointer;font-size:12px;color:var(--text-dim);text-decoration:underline;padding:8px 0;margin-left:auto">返回登录页</span>
     </div>
   </div>
 </div>

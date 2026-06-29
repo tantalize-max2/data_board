@@ -1233,8 +1233,18 @@ function openChangePwdModal(force){
   document.getElementById('changePwdAlert').style.display=force?'block':'none';
   document.getElementById('changePwdCancel').style.display=force?'none':'inline-block';
   document.getElementById('changePwdCloseBtn').style.display=force?'none':'inline-block';
+  document.getElementById('changePwdLogout').style.display=force?'inline':'none';
   document.getElementById('changePwdTitle').textContent=force?'首次登录 · 必须修改密码':'修改密码';
   document.getElementById('changePwdMask').classList.add('show');
+  /* 强制模式下阻止 ESC 关闭 */
+  if(force){
+    document.getElementById('changePwdMask').onkeydown=function(e){
+      if(e.key==='Escape'){e.preventDefault();e.stopPropagation();}
+    };
+    document.getElementById('changePwdMask').focus();
+  }else{
+    document.getElementById('changePwdMask').onkeydown=null;
+  }
 }
 function closeChangePwdModal(){
   document.getElementById('changePwdMask').classList.remove('show');
@@ -1255,6 +1265,11 @@ async function doChangePwd(){
     ROLE.must_change_pwd=false;
     closeChangePwdModal();
   }catch(e){showToast('网络错误','error');}
+}
+
+function doChangePwdLogout(){
+  closeChangePwdModal();
+  doLogout();
 }
 
 /* ====== 水印（10个从左下到右上平均分配） ====== */
