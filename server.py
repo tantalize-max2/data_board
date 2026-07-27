@@ -1862,6 +1862,392 @@ def admin_delete_file(filepath: str, request: Request):
     return {"ok": True}
 
 
+# ====== 辅助工具模块（独立于资料中心，带严格权限控制）======
+TOOLS_DIR = os.path.join(BASE_DIR, "tools")
+os.makedirs(TOOLS_DIR, exist_ok=True)
+_TOOL_ALLOWED_EXTS = {'.html', '.htm'}
+
+
+def _user_grant_conds(s: dict):
+    """构造当前用户命中的授权条件（role + user），返回 (sql片段, 参数)。
+    用于 tool_module_access 和 tool_access 两张表。"""
+    roles = get_user_all_roles(s["username"])
+    conds, params = [], []
+    for r in roles:
+        if not r:
+            continue
+        conds.append("(grant_type='role' AND grant_value=%s)")
+        params.append(r)
+    conds.append("(grant_type='user' AND grant_value=%s)")
+    params.append(s["username"])
+    return conds, params
+
+
+def _get_visible_module_ids(s: dict) -> Optional[set]:
+    """获取当前用户可见的工具模块ID集合（含工具级授权反向命中的模块）。
+    is_admin 返回 None（全部可见）。"""
+    if s.get("is_admin"):
+        return None
+    conds, params = _user_grant_conds(s)
+    if not conds:
+        return set()
+    cond_sql = " OR ".join(conds)
+    ids = set()
+    # 1. 模块级授权直接命中的模块
+    rows = db.query_all(
+        "SELECT DISTINCT module_id FROM tool_module_access WHERE " + cond_sql, params)
+    for r in rows:
+        ids.add(r["module_id"])
+    # 2. 工具级授权命中的工具 → 反查其所属模块
+    rows = db.query_all(
+        "SELECT DISTINCT module_id FROM tools WHERE id IN ("
+        "SELECT DISTINCT tool_id FROM tool_access WHERE " + cond_sql + ")", params)
+    for r in rows:
+        ids.add(r["module_id"])
+    return ids
+
+
+def _filter_visible_tools(s: dict, module_id: int, tools: list) -> list:
+    """过滤出用户在该模块下可见的工具（模块可见 OR 工具单独可见）。is_admin 全部可见。"""
+    if s.get("is_admin"):
+        return tools
+    conds, params = _user_grant_conds(s)
+    if not conds:
+        return []
+    cond_sql = " OR ".join(conds)
+    # 工具级授权命中的工具ID集合
+    rows = db.query_all(
+        "SELECT DISTINCT tool_id FROM tool_access WHERE " + cond_sql, params)
+    tool_granted = {r["tool_id"] for r in rows}
+    # 该模块是否对该用户整体授权（模块级）
+    m_rows = db.query_all(
+        "SELECT 1 FROM tool_module_access WHERE module_id=%s AND (" + cond_sql + ") LIMIT 1",
+        [module_id] + params)
+    module_granted = bool(m_rows)
+    result = []
+    for t in tools:
+        if module_granted or t["id"] in tool_granted:
+            result.append(t)
+    return result
+
+
+# ---- 业务接口（普通用户按权限查看）----
+
+@app.get("/api/tools")
+def tools_list(request: Request):
+    """列出当前用户可见的工具模块及其工具（叠加权限：模块可见 OR 工具单独可见）"""
+    s = require_session(request)
+    visible_ids = _get_visible_module_ids(s)
+    if visible_ids == set():
+        return {"modules": []}
+    if visible_ids is None:
+        modules = db.query_all("SELECT * FROM tool_modules ORDER BY sort_order, id")
+    else:
+        ph = ",".join(["%s"] * len(visible_ids))
+        modules = db.query_all(
+            f"SELECT * FROM tool_modules WHERE id IN ({ph}) ORDER BY sort_order, id",
+            list(visible_ids))
+    result = []
+    for m in modules:
+        tools = db.query_all(
+            "SELECT id,name,description,tool_type,url,file_path,icon,open_mode,sort_order "
+            "FROM tools WHERE module_id=%s AND is_active=1 ORDER BY sort_order, id",
+            (m["id"],))
+        tools = _filter_visible_tools(s, m["id"], tools)
+        if not tools:
+            continue  # 模块下没有可见工具则不展示该模块
+        result.append({
+            "id": m["id"], "name": m["name"],
+            "description": m["description"] or "", "sort_order": m["sort_order"],
+            "tools": tools,
+        })
+    return {"modules": result}
+
+
+@app.get("/api/tool-file/{filepath:path}")
+def tool_file(filepath: str, request: Request):
+    """访问工具 HTML 文件（需登录）"""
+    require_session(request)
+    safe = os.path.normpath(os.path.join(TOOLS_DIR, filepath))
+    if not safe.startswith(os.path.normpath(TOOLS_DIR)):
+        raise HTTPException(400, "路径非法")
+    if not os.path.isfile(safe):
+        raise HTTPException(404, "文件不存在")
+    return FileResponse(safe, headers={"Content-Type": "text/html; charset=utf-8",
+                                       "X-Frame-Options": "SAMEORIGIN"})
+
+
+# ---- 管理接口（仅总经理）----
+
+@app.get("/api/admin/tool-modules")
+def admin_tool_modules(request: Request):
+    """查询所有工具模块（含工具数和权限数）"""
+    require_admin(request)
+    modules = db.query_all("SELECT * FROM tool_modules ORDER BY sort_order, id")
+    for m in modules:
+        tc = db.query_one("SELECT COUNT(*) c FROM tools WHERE module_id=%s", (m["id"],))
+        ac = db.query_one("SELECT COUNT(*) c FROM tool_module_access WHERE module_id=%s", (m["id"],))
+        m["tool_count"] = tc["c"] if tc else 0
+        m["access_count"] = ac["c"] if ac else 0
+    return {"modules": modules}
+
+
+@app.post("/api/admin/tool-modules")
+async def admin_create_tool_module(request: Request):
+    """新建工具模块"""
+    s = require_admin(request)
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    desc = (body.get("description") or "").strip()
+    if not name:
+        raise HTTPException(400, "模块名称必填")
+    max_order = db.query_one("SELECT MAX(sort_order) m FROM tool_modules")
+    so = (max_order["m"] or 0) + 1 if max_order else 1
+    new_id = db.execute(
+        "INSERT INTO tool_modules(name,description,sort_order) VALUES(%s,%s,%s)",
+        (name, desc, so))
+    log_access(s["username"], "", "create", "tool_module", str(new_id),
+               json.dumps({"name": name}, ensure_ascii=False), request)
+    return {"ok": True, "id": new_id}
+
+
+@app.put("/api/admin/tool-modules/{mid}")
+async def admin_update_tool_module(mid: int, request: Request):
+    """编辑工具模块"""
+    s = require_admin(request)
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    desc = (body.get("description") or "").strip()
+    if not name:
+        raise HTTPException(400, "模块名称必填")
+    db.execute("UPDATE tool_modules SET name=%s,description=%s WHERE id=%s", (name, desc, mid))
+    return {"ok": True}
+
+
+@app.delete("/api/admin/tool-modules/{mid}")
+def admin_delete_tool_module(mid: int, request: Request):
+    """删除工具模块（同时删除其下工具文件和权限）"""
+    s = require_admin(request)
+    tools = db.query_all("SELECT file_path FROM tools WHERE module_id=%s", (mid,))
+    for t in tools:
+        if t.get("file_path"):
+            fp = os.path.join(TOOLS_DIR, t["file_path"])
+            if os.path.isfile(fp):
+                try:
+                    os.remove(fp)
+                except OSError:
+                    pass
+    db.execute("DELETE FROM tool_access WHERE tool_id IN (SELECT id FROM (SELECT id FROM tools WHERE module_id=%s) tmp)", (mid,))
+    db.execute("DELETE FROM tools WHERE module_id=%s", (mid,))
+    db.execute("DELETE FROM tool_module_access WHERE module_id=%s", (mid,))
+    db.execute("DELETE FROM tool_modules WHERE id=%s", (mid,))
+    log_access(s["username"], "", "delete", "tool_module", str(mid), "", request)
+    return {"ok": True}
+
+
+@app.put("/api/admin/tool-modules/reorder")
+async def admin_reorder_tool_modules(request: Request):
+    """模块排序。body: {"ids": [3,1,2]}"""
+    require_admin(request)
+    body = await request.json()
+    ids = body.get("ids") or []
+    for idx, mid in enumerate(ids):
+        db.execute("UPDATE tool_modules SET sort_order=%s WHERE id=%s", (idx + 1, mid))
+    return {"ok": True}
+
+
+@app.get("/api/admin/tools")
+def admin_tools_list(request: Request, module_id: int = 0):
+    """查询某模块下所有工具"""
+    require_admin(request)
+    if module_id:
+        rows = db.query_all("SELECT * FROM tools WHERE module_id=%s ORDER BY sort_order, id", (module_id,))
+    else:
+        rows = db.query_all("SELECT * FROM tools ORDER BY module_id, sort_order, id")
+    return {"tools": rows}
+
+
+@app.post("/api/admin/tools")
+async def admin_create_tool(request: Request):
+    """新增工具（链接类型）。body: {module_id,name,description,url,icon,open_mode}"""
+    s = require_admin(request)
+    body = await request.json()
+    module_id = body.get("module_id")
+    name = (body.get("name") or "").strip()
+    if not module_id or not name:
+        raise HTTPException(400, "模块和名称必填")
+    tool_type = body.get("tool_type", "link")
+    url = (body.get("url") or "").strip()
+    if tool_type == "link" and not url:
+        raise HTTPException(400, "链接类型必须填写URL")
+    max_order = db.query_one("SELECT MAX(sort_order) m FROM tools WHERE module_id=%s", (module_id,))
+    so = (max_order["m"] or 0) + 1 if max_order else 1
+    new_id = db.execute(
+        "INSERT INTO tools(module_id,name,description,tool_type,url,icon,open_mode,sort_order,updated_by) "
+        "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (module_id, name, (body.get("description") or "").strip(), tool_type, url,
+         (body.get("icon") or "").strip(), body.get("open_mode", "newtab"), so, s["username"]))
+    return {"ok": True, "id": new_id}
+
+
+@app.post("/api/admin/tools/upload")
+async def admin_upload_tool(request: Request = None, file: UploadFile = File(...)):
+    """上传 HTML 文件新建工具。表单字段: module_id, name, description, icon, open_mode, file"""
+    s = require_admin(request)
+    form = await request.form()
+    module_id = int(form.get("module_id") or 0)
+    name = (form.get("name") or "").strip()
+    if not module_id or not name:
+        raise HTTPException(400, "模块和名称必填")
+    fn = os.path.basename(file.filename or "tool.html")
+    ext = os.path.splitext(fn)[1].lower()
+    if ext not in _TOOL_ALLOWED_EXTS:
+        raise HTTPException(400, "仅支持 .html / .htm 文件")
+    # 唯一文件名防冲突
+    ts = int(time.time() * 1000)
+    stored_name = f"{ts}_{fn}"
+    fp = os.path.join(TOOLS_DIR, stored_name)
+    with open(fp, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    desc = (form.get("description") or "").strip()
+    icon = (form.get("icon") or "").strip()
+    open_mode = form.get("open_mode") or "iframe"
+    max_order = db.query_one("SELECT MAX(sort_order) m FROM tools WHERE module_id=%s", (module_id,))
+    so = (max_order["m"] or 0) + 1 if max_order else 1
+    new_id = db.execute(
+        "INSERT INTO tools(module_id,name,description,tool_type,file_path,icon,open_mode,sort_order,updated_by) "
+        "VALUES(%s,%s,%s,'html',%s,%s,%s,%s,%s)",
+        (module_id, name, desc, stored_name, icon, open_mode, so, s["username"]))
+    return {"ok": True, "id": new_id, "file_path": stored_name}
+
+
+@app.put("/api/admin/tools/{tid}")
+async def admin_update_tool(tid: int, request: Request):
+    """编辑工具"""
+    s = require_admin(request)
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "名称必填")
+    db.execute(
+        "UPDATE tools SET name=%s,description=%s,url=%s,icon=%s,open_mode=%s,updated_by=%s WHERE id=%s",
+        (name, (body.get("description") or "").strip(), (body.get("url") or "").strip(),
+         (body.get("icon") or "").strip(), body.get("open_mode", "newtab"), s["username"], tid))
+    return {"ok": True}
+
+
+@app.delete("/api/admin/tools/{tid}")
+def admin_delete_tool(tid: int, request: Request):
+    """删除工具（同时删除文件）"""
+    s = require_admin(request)
+    t = db.query_one("SELECT file_path FROM tools WHERE id=%s", (tid,))
+    if t and t.get("file_path"):
+        fp = os.path.join(TOOLS_DIR, t["file_path"])
+        if os.path.isfile(fp):
+            try:
+                os.remove(fp)
+            except OSError:
+                pass
+    db.execute("DELETE FROM tool_access WHERE tool_id=%s", (tid,))
+    db.execute("DELETE FROM tools WHERE id=%s", (tid,))
+    return {"ok": True}
+
+
+@app.put("/api/admin/tools/reorder")
+async def admin_reorder_tools(request: Request):
+    """工具排序。body: {"ids": [5,3,8]}"""
+    require_admin(request)
+    body = await request.json()
+    ids = body.get("ids") or []
+    for idx, tid in enumerate(ids):
+        db.execute("UPDATE tools SET sort_order=%s WHERE id=%s", (idx + 1, tid))
+    return {"ok": True}
+
+
+# ---- 工具模块权限配置（赋予到角色 / 赋予到个人）----
+
+@app.get("/api/admin/tool-access/{mid}")
+def admin_get_tool_access(mid: int, request: Request):
+    """查询某模块的权限配置"""
+    require_admin(request)
+    rules = db.query_all("SELECT grant_type,grant_value FROM tool_module_access WHERE module_id=%s", (mid,))
+    # 可选角色列表（去重）
+    roles = db.query_all(
+        "SELECT DISTINCT role_name FROM users WHERE is_active=1 AND role_name!='' "
+        "AND is_admin=0 ORDER BY role_name")
+    # 可选用户列表
+    users = db.query_all(
+        "SELECT username,name,role_name,zone_name FROM users WHERE is_active=1 AND is_admin=0 "
+        "ORDER BY zone_name, role_name, name")
+    return {
+        "granted_roles": [r["grant_value"] for r in rules if r["grant_type"] == "role"],
+        "granted_users": [r["grant_value"] for r in rules if r["grant_type"] == "user"],
+        "available_roles": [r["role_name"] for r in roles],
+        "available_users": users,
+    }
+
+
+@app.put("/api/admin/tool-access/{mid}")
+async def admin_set_tool_access(mid: int, request: Request):
+    """设置模块权限（覆盖式）。body: {"roles":["客户经理"], "users":["138xxx"]}"""
+    s = require_admin(request)
+    body = await request.json()
+    roles = body.get("roles") or []
+    users = body.get("users") or []
+    db.execute("DELETE FROM tool_module_access WHERE module_id=%s", (mid,))
+    rows = [("role", r) for r in roles if r] + [("user", u) for u in users if u]
+    if rows:
+        db.executemany(
+            "INSERT IGNORE INTO tool_module_access(module_id,grant_type,grant_value) VALUES(%s,%s,%s)",
+            [(mid, gt, gv) for gt, gv in rows])
+    log_access(s["username"], "", "grant", "tool_access", str(mid),
+               json.dumps({"roles": len(roles), "users": len(users)}, ensure_ascii=False), request)
+    return {"ok": True, "roles": len(roles), "users": len(users)}
+
+
+# ---- 工具级权限配置（赋予到角色 / 赋予到个人，叠加于模块权限之上）----
+
+@app.get("/api/admin/tool-item-access/{tid}")
+def admin_get_tool_item_access(tid: int, request: Request):
+    """查询某工具的单独权限配置"""
+    require_admin(request)
+    t = db.query_one("SELECT id,name FROM tools WHERE id=%s", (tid,))
+    if not t:
+        raise HTTPException(404, "工具不存在")
+    rules = db.query_all("SELECT grant_type,grant_value FROM tool_access WHERE tool_id=%s", (tid,))
+    roles = db.query_all(
+        "SELECT DISTINCT role_name FROM users WHERE is_active=1 AND role_name!='' "
+        "AND is_admin=0 ORDER BY role_name")
+    users = db.query_all(
+        "SELECT username,name,role_name,zone_name FROM users WHERE is_active=1 AND is_admin=0 "
+        "ORDER BY zone_name, role_name, name")
+    return {
+        "tool": t,
+        "granted_roles": [r["grant_value"] for r in rules if r["grant_type"] == "role"],
+        "granted_users": [r["grant_value"] for r in rules if r["grant_type"] == "user"],
+        "available_roles": [r["role_name"] for r in roles],
+        "available_users": users,
+    }
+
+
+@app.put("/api/admin/tool-item-access/{tid}")
+async def admin_set_tool_item_access(tid: int, request: Request):
+    """设置工具单独权限（覆盖式）。body: {"roles":[], "users":[]}"""
+    s = require_admin(request)
+    body = await request.json()
+    roles = body.get("roles") or []
+    users = body.get("users") or []
+    db.execute("DELETE FROM tool_access WHERE tool_id=%s", (tid,))
+    rows = [("role", r) for r in roles if r] + [("user", u) for u in users if u]
+    if rows:
+        db.executemany(
+            "INSERT IGNORE INTO tool_access(tool_id,grant_type,grant_value) VALUES(%s,%s,%s)",
+            [(tid, gt, gv) for gt, gv in rows])
+    log_access(s["username"], "", "grant", "tool_item_access", str(tid),
+               json.dumps({"roles": len(roles), "users": len(users)}, ensure_ascii=False), request)
+    return {"ok": True, "roles": len(roles), "users": len(users)}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8001)

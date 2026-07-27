@@ -134,7 +134,7 @@ function closeDrawer(){closeModal();}
 document.getElementById('drawerMask').addEventListener('click',closeModal);
 
 /* Tab 切换 */
-const TAB_LOADERS = {overview:loadOverview, users:loadUsers, access:loadAccess, content:loadContent};
+const TAB_LOADERS = {overview:loadOverview, users:loadUsers, access:loadAccess, content:loadContent, tools:loadTools};
 document.querySelectorAll('.nav-item').forEach(item=>{
   item.addEventListener('click',()=>{
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -665,6 +665,275 @@ async function delRecord(rid){
   if(!confirm('确认删除记录 #'+rid+'？此操作不可恢复。'))return;
   try{ await api('/api/admin/records/'+rid,{method:'DELETE'}); toast('已删除','success'); fetchRecords(); }
   catch(e){toast(e.message,'error');}
+}
+
+/* ====== 辅助工具管理 ====== */
+let TOOLS_STATE={modules:[], currentModule:0};
+
+async function loadTools(){
+  const el=document.getElementById('tab-tools');
+  el.innerHTML='<div class="loading">加载中...</div>';
+  try{
+    const d=await api('/api/admin/tool-modules');
+    TOOLS_STATE.modules=d.modules||[];
+    renderToolModules();
+  }catch(e){ el.innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
+}
+
+function renderToolModules(){
+  const el=document.getElementById('tab-tools');
+  const ms=TOOLS_STATE.modules;
+  let h=`
+    <div class="panel-title">辅助工具管理
+      <button class="btn btn-primary btn-sm" style="float:right;margin-top:-4px" onclick="openModuleEdit(0)">+ 新建模块</button>
+    </div>
+    <p style="color:var(--text-dim);font-size:12px;margin:4px 0 16px">
+      用于展示常用 HTML 小工具或外部链接。总经理可见全部，其他角色需在「权限」中授权才能查看。
+    </p>`;
+  if(!ms.length){
+    h+='<div class="empty">暂无模块，点击右上角「新建模块」开始</div>';
+  }else{
+    h+='<div class="tools-module-list">';
+    ms.forEach(m=>{
+      h+=`<div class="tools-module-card">
+        <div class="tools-module-head">
+          <div>
+            <span class="tools-module-name">${esc(m.name)}</span>
+            ${m.description?`<span class="tools-module-desc">${esc(m.description)}</span>`:''}
+          </div>
+          <div class="tools-module-actions">
+            <button class="btn btn-sm" onclick="openToolManage(${m.id},'${esc(m.name)}')">工具(${m.tool_count})</button>
+            <button class="btn btn-sm" onclick="openToolAccess(${m.id},'${esc(m.name)}')">权限(${m.access_count})</button>
+            <button class="btn btn-sm" onclick="openModuleEdit(${m.id})">编辑</button>
+            <button class="btn btn-danger btn-sm" onclick="delToolModule(${m.id},'${esc(m.name)}')">删除</button>
+          </div>
+        </div>
+      </div>`;
+    });
+    h+='</div>';
+  }
+  el.innerHTML=h;
+}
+
+function openModuleEdit(mid){
+  const m=TOOLS_STATE.modules.find(x=>x.id===mid)||{};
+  openModal(mid?'编辑模块':'新建模块',
+    `<div class="form-grid">
+      <div class="form-field"><label>模块名称</label><input id="tm_name" value="${esc(m.name||'')}" placeholder="如：效率工具"></div>
+      <div class="form-field full"><label>模块描述（可选）</label><input id="tm_desc" value="${esc(m.description||'')}" placeholder="简要介绍该模块用途"></div>
+    </div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveModule(${mid||0})">${mid?'保存':'创建'}</button>`);
+}
+
+async function saveModule(mid){
+  const name=document.getElementById('tm_name').value.trim();
+  const description=document.getElementById('tm_desc').value.trim();
+  if(!name){toast('模块名称必填','error');return;}
+  try{
+    if(mid) await api('/api/admin/tool-modules/'+mid,{method:'PUT',body:{name,description}});
+    else await api('/api/admin/tool-modules',{method:'POST',body:{name,description}});
+    toast(mid?'已保存':'已创建','success'); closeModal(); loadTools();
+  }catch(e){toast(e.message,'error');}
+}
+
+async function delToolModule(mid,name){
+  if(!confirm('确认删除模块「'+name+'」？\n该模块下所有工具和文件都会被删除，此操作不可恢复。'))return;
+  try{ await api('/api/admin/tool-modules/'+mid,{method:'DELETE'}); toast('已删除','success'); loadTools(); }
+  catch(e){toast(e.message,'error');}
+}
+
+/* 工具管理（模块下的工具列表） */
+let TOOLS_LIST_CACHE=[];
+async function openToolManage(mid,name){
+  TOOLS_STATE.currentModule=mid;
+  try{
+    const d=await api('/api/admin/tools?module_id='+mid);
+    const tools=d.tools||[];
+    TOOLS_LIST_CACHE=tools;
+    let h=`
+      <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="openLinkToolEdit(0,${mid})">+ 添加链接</button>
+        <label class="btn btn-primary btn-sm" style="cursor:pointer">+ 上传HTML工具<input type="file" accept=".html,.htm" style="display:none" onchange="uploadHtmlTool(${mid},this.files[0])"></label>
+      </div>`;
+    if(!tools.length){
+      h+='<div class="empty">该模块暂无工具</div>';
+    }else{
+      h+='<div class="tools-tool-list">';
+      tools.forEach(t=>{
+        const badge=t.tool_type==='html'?'<span class="tag tag-public">HTML</span>':'<span class="tag tag-business">链接</span>';
+        const detail=t.tool_type==='html'?'内嵌文件':esc(t.url||'');
+        const descTitle=t.description?(' title="'+esc(t.description).replace(/"/g,'&quot;')+'"'):'';
+        h+=`<div class="tools-tool-row">
+          <div>
+            <span class="tools-tool-name">${badge} ${esc(t.name)}</span>
+            ${t.description?`<div class="tools-tool-desc"${descTitle}>${esc(t.description)}</div>`:''}
+            <div class="tools-tool-meta">${detail} · 打开方式：${t.open_mode==='iframe'?'内嵌预览':'新窗口'}</div>
+          </div>
+          <div class="tools-tool-actions">
+            <button class="btn btn-sm" onclick="openToolItemAccess(${t.id})">权限</button>
+            <button class="btn btn-sm" onclick="openLinkToolEdit(${t.id},${mid})">编辑</button>
+            <button class="btn btn-danger btn-sm" onclick="delTool(${t.id})">删除</button>
+          </div>
+        </div>`;
+      });
+      h+='</div>';
+    }
+    openModal('「'+name+'」工具管理', h, '', true);
+  }catch(e){toast(e.message,'error');}
+}
+
+function openLinkToolEdit(tid,mid){
+  const isEdit=!!tid;
+  const t=isEdit?(TOOLS_LIST_CACHE.find(x=>x.id===tid)||{}):{};
+  openModal(isEdit?'编辑工具':'添加工具',
+    `<div class="form-grid">
+      <div class="form-field"><label>工具名称</label><input id="tt_name" value="${esc(t.name||'')}" placeholder="如：商机分析器"></div>
+      <div class="form-field full"><label>描述（可选）</label><textarea id="tt_desc" rows="2" placeholder="介绍这个工具的用途">${esc(t.description||'')}</textarea></div>
+      <div class="form-field full"><label>${t.tool_type==='html'?'链接地址（HTML类型不可用）':'链接地址'}</label><input id="tt_url" value="${esc(t.url||'')}" placeholder="https://..." ${t.tool_type==='html'?'disabled':''}></div>
+      <div class="form-field"><label>打开方式</label>
+        <select id="tt_open"><option value="newtab" ${t.open_mode==='newtab'?'selected':''}>新窗口打开</option><option value="iframe" ${t.open_mode==='iframe'?'selected':''}>内嵌预览</option></select>
+      </div>
+      <div class="form-field"><label>图标标识（可选）</label><input id="tt_icon" value="${esc(t.icon||'')}" placeholder="如：chart"></div>
+    </div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveLinkTool(${tid},${mid})">${isEdit?'保存':'添加'}</button>`);
+}
+
+async function saveLinkTool(tid,mid){
+  const name=document.getElementById('tt_name').value.trim();
+  const description=document.getElementById('tt_desc').value.trim();
+  const url=document.getElementById('tt_url').value.trim();
+  const open_mode=document.getElementById('tt_open').value;
+  const icon=document.getElementById('tt_icon').value.trim();
+  if(!name){toast('名称必填','error');return;}
+  /* 判断工具类型：编辑时取缓存，新增时为 link */
+  const existTool=tid?(TOOLS_LIST_CACHE.find(x=>x.id===tid)||{}):{};
+  const toolType=existTool.tool_type||'link';
+  if(toolType==='link' && !url){toast('链接地址必填','error');return;}
+  try{
+    if(tid) await api('/api/admin/tools/'+tid,{method:'PUT',body:{name,description,url,open_mode,icon}});
+    else await api('/api/admin/tools',{method:'POST',body:{module_id:mid,name,description,url,open_mode,icon,tool_type:'link'}});
+    toast(tid?'已保存':'已添加','success'); closeModal(); 
+    // 刷新工具列表
+    const m=TOOLS_STATE.modules.find(x=>x.id===mid);
+    openToolManage(mid, m?m.name:'');
+  }catch(e){toast(e.message,'error');}
+}
+
+async function uploadHtmlTool(mid,file){
+  if(!file){return;}
+  const name=file.name.replace(/\.[^.]+$/,'');
+  const fd=new FormData();
+  fd.append('module_id',mid);
+  fd.append('name',name);
+  fd.append('description','');
+  fd.append('open_mode','iframe');
+  fd.append('file',file);
+  try{
+    const sep='?token='+encodeURIComponent(TOKEN);
+    const res=await fetch('/api/admin/tools/upload'+sep,{method:'POST',body:fd});
+    if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.detail||'上传失败');}
+    toast('上传成功','success');
+    const m=TOOLS_STATE.modules.find(x=>x.id===mid);
+    openToolManage(mid, m?m.name:'');
+  }catch(e){toast(e.message,'error');}
+}
+
+async function delTool(tid){
+  if(!confirm('确认删除该工具？'))return;
+  try{ await api('/api/admin/tools/'+tid,{method:'DELETE'}); toast('已删除','success');
+    // 刷新当前模块工具列表
+    const mid=TOOLS_STATE.currentModule;
+    const m=TOOLS_STATE.modules.find(x=>x.id===mid);
+    openToolManage(mid, m?m.name:'');
+  }catch(e){toast(e.message,'error');}
+}
+
+/* 工具权限配置（模块级 + 工具级共用渲染） */
+function _renderAccessContent(d, title, hint, onSaveCall){
+  const gr=new Set(d.granted_roles||[]);
+  const gu=new Set(d.granted_users||[]);
+  const roles=(d.available_roles||[]).map(r=>({
+    html:`<label class="access-check"><input type="checkbox" value="${esc(r)}" ${gr.has(r)?'checked':''}> ${esc(r)}</label>`,
+    kw:esc(r).toLowerCase()
+  }));
+  const users=(d.available_users||[]).map(u=>{
+    const label=esc(u.name||u.username);
+    const sub=esc(u.role_name)+' · '+esc(u.zone_name||'');
+    return {
+      html:`<label class="access-check"><input type="checkbox" value="${esc(u.username)}" ${gu.has(u.username)?'checked':''}>
+        <span>${label}</span>
+        <span class="access-check-sub">${sub}</span>
+      </label>`,
+      kw:(u.name||'')+' '+(u.username||'')+' '+(u.role_name||'')+' '+(u.zone_name||'')
+    };
+  });
+  const roleSearchHTML=roles.length?`<input type="text" id="roleSearchBox" class="access-search-box" placeholder="搜索角色..." oninput="filterAccessList('accessRoleList',this.value)">`:'<div class="empty">暂无角色</div>';
+  const userSearchHTML=users.length?`<input type="text" id="userSearchBox" class="access-search-box" placeholder="搜索姓名/手机号/角色..." oninput="filterAccessList('accessUserList',this.value)">`:'<div class="empty">暂无用户</div>';
+  openModal(title,
+    `<div style="margin-bottom:12px;color:var(--text-dim);font-size:13px">${hint}</div>
+     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div class="panel-subtitle">赋予角色</div>
+        ${roleSearchHTML}
+        <div class="access-check-list" id="accessRoleList">${roles.map(x=>x.html).join('')||'<div class="empty">暂无角色</div>'}</div>
+      </div>
+      <div>
+        <div class="panel-subtitle">赋予个人</div>
+        ${userSearchHTML}
+        <div class="access-check-list" id="accessUserList">${users.map(x=>x.html).join('')||'<div class="empty">暂无用户</div>'}</div>
+      </div>
+     </div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="${onSaveCall}">保存权限</button>`, true);
+}
+
+async function openToolAccess(mid,name){
+  try{
+    const d=await api('/api/admin/tool-access/'+mid);
+    _renderAccessContent(d, '「'+name+'」模块权限配置',
+      '勾选后，对应角色或个人可看到该模块下的<b>所有工具</b>。总经理默认可见全部，无需配置。',
+      `saveToolAccess(${mid})`);
+  }catch(e){toast(e.message,'error');}
+}
+
+/* 工具级权限：单独控制某个工具可见性（叠加于模块权限之上） */
+async function openToolItemAccess(tid){
+  try{
+    const d=await api('/api/admin/tool-item-access/'+tid);
+    const name=d.tool?d.tool.name:('#'+tid);
+    _renderAccessContent(d, '「'+name+'」工具权限配置',
+      '此处为<b>单独授权</b>，叠加于模块权限之上。模块已授权的角色无需重复配置；此处可让某角色/个人<b>单独</b>看到该工具。',
+      `saveToolItemAccess(${tid})`);
+  }catch(e){toast(e.message,'error');}
+}
+
+function filterAccessList(listId,kw){
+  kw=kw.trim().toLowerCase();
+  const list=document.getElementById(listId);
+  if(!list)return;
+  list.querySelectorAll('.access-check').forEach(label=>{
+    const text=label.textContent.toLowerCase();
+    label.style.display=(!kw||text.includes(kw))?'':'none';
+  });
+}
+
+async function saveToolAccess(mid){
+  const roles=[...document.querySelectorAll('#accessRoleList input:checked')].map(c=>c.value);
+  const users=[...document.querySelectorAll('#accessUserList input:checked')].map(c=>c.value);
+  try{
+    await api('/api/admin/tool-access/'+mid,{method:'PUT',body:{roles,users}});
+    toast('权限已保存（'+roles.length+' 角色 / '+users.length+' 个人）','success');
+    closeModal(); loadTools();
+  }catch(e){toast(e.message,'error');}
+}
+
+async function saveToolItemAccess(tid){
+  const roles=[...document.querySelectorAll('#accessRoleList input:checked')].map(c=>c.value);
+  const users=[...document.querySelectorAll('#accessUserList input:checked')].map(c=>c.value);
+  try{
+    await api('/api/admin/tool-item-access/'+tid,{method:'PUT',body:{roles,users}});
+    toast('工具权限已保存（'+roles.length+' 角色 / '+users.length+' 个人）','success');
+    closeModal();
+  }catch(e){toast(e.message,'error');}
 }
 
 /* 启动 */

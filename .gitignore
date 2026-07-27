@@ -17,6 +17,9 @@ test/
 # 资料中心文件（服务器用Docker卷管理，不提交）
 info/
 
+# 辅助工具HTML文件（服务器用Docker卷管理，不提交）
+tools/
+
 # IDE
 .vscode/
 .idea/

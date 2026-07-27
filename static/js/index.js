@@ -104,6 +104,8 @@ async function loadMainPage(){
   }catch(e){document.getElementById('mainBattleGrid').innerHTML='<div class="empty-state">加载失败</div>';}
   /* 资料中心独立加载，不受 overview 失败影响，确保所有用户都能看到 */
   loadInfoSections();
+  /* 辅助工具加载（按权限过滤） */
+  loadToolsSection();
 }
 
 function renderBattleGrid(battles){
@@ -1301,3 +1303,134 @@ navigate=function(name){
   _origNavigate(name);
   setTimeout(updateWatermark,50);
 };
+
+/* ====== 辅助工具（按权限展示）====== */
+let _toolPreviewUrl='';
+
+async function loadToolsSection(){
+  try{
+    const res=await fetch('/api/tools?token='+encodeURIComponent(TOKEN));
+    if(!res.ok){return;}
+    const data=await res.json();
+    const modules=data.modules||[];
+    if(!modules.length){return;} /* 无可见模块则隐藏整个区域 */
+    document.getElementById('toolsSectionLabel').style.display='block';
+    document.getElementById('mainToolsArea').style.display='block';
+    renderToolsArea(modules);
+  }catch(e){ /* 静默失败 */ }
+}
+
+function renderToolsArea(modules){
+  let h='';
+  modules.forEach(m=>{
+    const tools=m.tools||[];
+    if(!tools.length)return;
+    h+=`<div class="tools-section-block">
+      <div class="tools-section-title">${esc(m.name)}</div>
+      ${m.description?`<div class="tools-section-desc">${esc(m.description)}</div>`:''}
+      <div class="tools-grid">`;
+    tools.forEach(t=>{
+      const isHtml=t.tool_type==='html';
+      const icon=t.icon||('tool');
+      /* 描述完整内容放到 data-desc，供自定义 tooltip 使用；卡片上截断显示 */
+      const descEsc=esc(t.description||'');
+      h+=`<div class="tools-card" onclick="openTool(${t.id},${isHtml?1:0},'${esc(t.tool_type)}','${esc((t.url||'').replace(/'/g,"\\'"))}','${esc((t.file_path||'').replace(/'/g,"\\'"))}','${esc((t.name||'').replace(/'/g,"\\'"))}','${esc(t.open_mode||'newtab')}')">
+        <div class="tools-card-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18M9 21V9"/>
+          </svg>
+        </div>
+        <div class="tools-card-body">
+          <div class="tools-card-name">${esc(t.name)}</div>
+          ${descEsc?`<div class="tools-card-desc" data-desc="${descEsc}">${descEsc}</div>`:''}
+          <div class="tools-card-badge">${isHtml?'HTML工具':'链接'}</div>
+        </div>
+      </div>`;
+    });
+    h+=`</div></div>`;
+  });
+  document.getElementById('mainToolsArea').innerHTML=h||'';
+  bindToolTips();
+}
+
+/* ====== 自定义 Tooltip（替代原生 title，风格与整体一致）====== */
+let _tooltipEl=null, _tooltipTimer=null;
+function bindToolTips(){
+  if(!_tooltipEl){
+    _tooltipEl=document.createElement('div');
+    _tooltipEl.className='custom-tooltip';
+    _tooltipEl.style.display='none';
+    document.body.appendChild(_tooltipEl);
+  }
+  document.querySelectorAll('[data-desc]').forEach(el=>{
+    if(el._tipBound)return;
+    el._tipBound=true;
+    el.addEventListener('mouseenter',()=>showToolTip(el));
+    el.addEventListener('mouseleave',hideToolTip);
+    el.addEventListener('mousemove',e=>moveToolTip(e));
+  });
+}
+function showToolTip(el){
+  clearTimeout(_tooltipTimer);
+  const text=el.getAttribute('data-desc');
+  if(!text||!text.trim())return;
+  _tooltipTimer=setTimeout(()=>{
+    _tooltipEl.textContent=text;
+    _tooltipEl.style.display='block';
+    moveToolTip(_lastMouseEv);
+  },200);
+}
+let _lastMouseEv=null;
+function moveToolTip(e){
+  if(!_tooltipEl||_tooltipEl.style.display==='none')return;
+  _lastMouseEv=e;
+  if(!e)return;
+  const pad=14;
+  const tw=_tooltipEl.offsetWidth, th=_tooltipEl.offsetHeight;
+  let x=e.clientX+pad, y=e.clientY+pad;
+  if(x+tw>window.innerWidth)x=e.clientX-tw-pad;
+  if(y+th>window.innerHeight)y=e.clientY-th-pad;
+  _tooltipEl.style.left=x+'px';
+  _tooltipEl.style.top=y+'px';
+}
+function hideToolTip(){
+  clearTimeout(_tooltipTimer);
+  if(_tooltipEl)_tooltipEl.style.display='none';
+}
+/* 监听全局 mousemove 以缓存坐标 */
+document.addEventListener('mousemove',e=>{_lastMouseEv=e;});
+
+function openTool(id,isHtml,toolType,url,filePath,name,openMode){
+  if(toolType==='html'){
+    const src='/api/tool-file/'+encodeURIComponent(filePath)+'?token='+encodeURIComponent(TOKEN);
+    _toolPreviewUrl=src;
+    if(openMode==='newtab'){
+      window.open(src,'_blank');
+    }else{
+      document.getElementById('toolPreviewTitle').textContent=name;
+      document.getElementById('toolPreviewFrame').src=src;
+      document.getElementById('toolPreviewModal').classList.add('show');
+    }
+  }else{
+    /* 链接类型 */
+    _toolPreviewUrl=url;
+    if(openMode==='iframe'){
+      document.getElementById('toolPreviewTitle').textContent=name;
+      document.getElementById('toolPreviewFrame').src=url;
+      document.getElementById('toolPreviewModal').classList.add('show');
+    }else{
+      window.open(url,'_blank');
+    }
+  }
+}
+
+function closeToolPreview(){
+  document.getElementById('toolPreviewModal').classList.remove('show');
+  document.getElementById('toolPreviewFrame').src='about:blank';
+  _toolPreviewUrl='';
+}
+
+function openToolNewTab(){
+  if(_toolPreviewUrl)window.open(_toolPreviewUrl,'_blank');
+}

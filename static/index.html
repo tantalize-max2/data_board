@@ -44,6 +44,9 @@
     <div class="troop-overview"><div class="label" id="troopLabel">兵种</div><div class="troop-zones-grid" id="mainTroopZones"></div></div>
     <!-- 资料中心 -->
     <div class="section-label">资料中心</div><div class="info-main-grid" id="mainInfoGrid"></div>
+    <!-- 辅助工具 -->
+    <div class="section-label" id="toolsSectionLabel" style="display:none">辅助工具</div>
+    <div id="mainToolsArea" style="display:none"></div>
     <div class="motto-section"><div class="motto-text">以"商机+标准化"为灵魂</div><div class="motto-sub">扎硬寨，打呆仗，走笨路，用凡人，要巧思，需新为</div></div>
   </div>
 </div>
@@ -116,6 +119,22 @@
       <button class="modal-close" onclick="closeInfoModal()">&times;</button>
     </div>
     <div class="modal-body" id="infoModalBody"></div>
+  </div>
+</div>
+
+<!-- 辅助工具 - HTML内嵌预览弹窗 -->
+<div class="modal-mask" id="toolPreviewModal" onclick="if(event.target===this)closeToolPreview()">
+  <div class="modal-box modal-lg" style="height:88vh;display:flex;flex-direction:column">
+    <div class="modal-header">
+      <h3 id="toolPreviewTitle">工具预览</h3>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <button class="modal-btn modal-btn-ok" style="padding:4px 14px;font-size:12px" id="toolPreviewNewTab" onclick="openToolNewTab()">新窗口打开</button>
+        <button class="modal-close" onclick="closeToolPreview()">&times;</button>
+      </div>
+    </div>
+    <div class="modal-body" style="flex:1;padding:0;overflow:hidden">
+      <iframe id="toolPreviewFrame" style="width:100%;height:100%;border:none" src="about:blank"></iframe>
+    </div>
   </div>
 </div>
 

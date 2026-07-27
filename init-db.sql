@@ -133,6 +133,60 @@ CREATE TABLE IF NOT EXISTS access_logs (
   INDEX idx_time (op_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ====== 辅助工具模块 ======
+-- 工具模块（分类，类似资料中心的板块，可新建）
+CREATE TABLE IF NOT EXISTS tool_modules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,               -- 模块名称
+  description VARCHAR(512) DEFAULT '',       -- 模块描述
+  sort_order INT DEFAULT 0,                  -- 排序
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 工具项（HTML 文件 或 外部链接，带描述）
+CREATE TABLE IF NOT EXISTS tools (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  module_id INT NOT NULL,                    -- 所属模块
+  name VARCHAR(128) NOT NULL,                -- 工具名称
+  description TEXT,                          -- 工具描述/介绍
+  tool_type VARCHAR(16) DEFAULT 'html',      -- html=上传HTML文件, link=外部链接
+  url VARCHAR(1024) DEFAULT '',              -- link 类型的链接地址
+  file_path VARCHAR(512) DEFAULT '',         -- html 类型的文件存储相对路径
+  icon VARCHAR(64) DEFAULT '',               -- 图标标识（可选）
+  open_mode VARCHAR(16) DEFAULT 'iframe',    -- iframe=内嵌预览, newtab=新窗口打开
+  sort_order INT DEFAULT 0,
+  is_active TINYINT DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_by VARCHAR(64) DEFAULT '',
+  INDEX idx_module (module_id),
+  INDEX idx_sort (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 辅助工具模块权限（模块级授权：赋予到角色 / 赋予到个人）
+CREATE TABLE IF NOT EXISTS tool_module_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  module_id INT NOT NULL,                    -- 授权的模块
+  grant_type VARCHAR(16) NOT NULL,           -- 'role'=赋予到角色, 'user'=赋予到个人
+  grant_value VARCHAR(128) NOT NULL,         -- role 时=角色名, user 时=用户名(手机号)
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_module_grant (module_id, grant_type, grant_value),
+  INDEX idx_module (module_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 辅助工具权限（工具级授权：赋予到角色 / 赋予到个人）
+-- 叠加逻辑：用户可见某工具 = 其可见该模块 OR 该工具被单独授权
+CREATE TABLE IF NOT EXISTS tool_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tool_id INT NOT NULL,                     -- 授权的工具
+  grant_type VARCHAR(16) NOT NULL,          -- 'role'=赋予到角色, 'user'=赋予到个人
+  grant_value VARCHAR(128) NOT NULL,        -- role 时=角色名, user 时=用户名(手机号)
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_tool_grant (tool_id, grant_type, grant_value),
+  INDEX idx_tool (tool_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 初始战役数据
 INSERT IGNORE INTO battles (id, name, color, sort_order) VALUES
 ('b1', '一号工程战', '#8B1A1A', 1),
