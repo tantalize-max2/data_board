@@ -1331,16 +1331,20 @@ function renderToolsArea(modules){
       <div class="tools-grid">`;
     tools.forEach(t=>{
       const isHtml=t.tool_type==='html';
-      const icon=t.icon||('tool');
       /* 描述完整内容放到 data-desc，供自定义 tooltip 使用；卡片上截断显示 */
       const descEsc=esc(t.description||'');
-      h+=`<div class="tools-card" onclick="openTool(${t.id},${isHtml?1:0},'${esc(t.tool_type)}','${esc((t.url||'').replace(/'/g,"\\'"))}','${esc((t.file_path||'').replace(/'/g,"\\'"))}','${esc((t.name||'').replace(/'/g,"\\'"))}','${esc(t.open_mode||'newtab')}')">
-        <div class="tools-card-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      /* 图标：有上传图标显示图片，否则显示默认 SVG */
+      let iconHtml;
+      if(t.icon){
+        iconHtml=`<img src="/api/tool-icon/${esc(t.icon)}?token=${encodeURIComponent(TOKEN)}" class="tools-card-icon-img" onerror="this.outerHTML='<svg width=\\'24\\' height=\\'24\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'currentColor\\' stroke-width=\\'1.5\\'><rect x=\\'3\\' y=\\'3\\' width=\\'18\\' height=\\'18\\' rx=\\'2\\'/><path d=\\'M3 9h18M9 21V9\\'/></svg>'">`;
+      }else{
+        iconHtml=`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <rect x="3" y="3" width="18" height="18" rx="2"/>
             <path d="M3 9h18M9 21V9"/>
-          </svg>
-        </div>
+          </svg>`;
+      }
+      h+=`<div class="tools-card" onclick="openTool(${t.id},${isHtml?1:0},'${esc(t.tool_type)}','${esc((t.url||'').replace(/'/g,"\\'"))}','${esc((t.file_path||'').replace(/'/g,"\\'"))}','${esc((t.name||'').replace(/'/g,"\\'"))}','${esc(t.open_mode||'newtab')}')">
+        <div class="tools-card-icon">${iconHtml}</div>
         <div class="tools-card-body">
           <div class="tools-card-name">${esc(t.name)}</div>
           ${descEsc?`<div class="tools-card-desc" data-desc="${descEsc}">${descEsc}</div>`:''}

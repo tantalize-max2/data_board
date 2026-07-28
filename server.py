@@ -1864,8 +1864,14 @@ def admin_delete_file(filepath: str, request: Request):
 
 # ====== 辅助工具模块（独立于资料中心，带严格权限控制）======
 TOOLS_DIR = os.path.join(BASE_DIR, "tools")
+TOOLS_ICON_DIR = os.path.join(TOOLS_DIR, "icons")
 os.makedirs(TOOLS_DIR, exist_ok=True)
+os.makedirs(TOOLS_ICON_DIR, exist_ok=True)
 _TOOL_ALLOWED_EXTS = {'.html', '.htm'}
+_TOOL_ICON_EXTS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico'}
+_ICON_MIME = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+              '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+              '.ico': 'image/x-icon'}
 
 
 def _user_grant_conds(s: dict):
@@ -1975,6 +1981,20 @@ def tool_file(filepath: str, request: Request):
         raise HTTPException(404, "文件不存在")
     return FileResponse(safe, headers={"Content-Type": "text/html; charset=utf-8",
                                        "X-Frame-Options": "SAMEORIGIN"})
+
+
+@app.get("/api/tool-icon/{filepath:path}")
+def tool_icon(filepath: str, request: Request):
+    """访问工具图标图片（需登录，支持缓存）"""
+    require_session(request)
+    safe = os.path.normpath(os.path.join(TOOLS_DIR, filepath))
+    if not safe.startswith(os.path.normpath(TOOLS_DIR)):
+        raise HTTPException(400, "路径非法")
+    if not os.path.isfile(safe):
+        raise HTTPException(404, "图标不存在")
+    ext = os.path.splitext(safe)[1].lower()
+    ctype = _ICON_MIME.get(ext, "application/octet-stream")
+    return FileResponse(safe, headers={"Content-Type": ctype, "Cache-Control": "max-age=3600"})
 
 
 # ---- 管理接口（仅总经理）----
@@ -2119,6 +2139,25 @@ async def admin_upload_tool(request: Request = None, file: UploadFile = File(...
         "VALUES(%s,%s,%s,'html',%s,%s,%s,%s,%s)",
         (module_id, name, desc, stored_name, icon, open_mode, so, s["username"]))
     return {"ok": True, "id": new_id, "file_path": stored_name}
+
+
+@app.post("/api/admin/tools/upload-icon")
+async def admin_upload_tool_icon(request: Request = None, file: UploadFile = File(...)):
+    """上传工具图标图片。返回存储路径（写入 tools.icon 字段）。
+    可在新建/编辑工具前先上传图标，再把返回的 icon 路径随表单提交。"""
+    require_admin(request)
+    fn = os.path.basename(file.filename or "icon.png")
+    ext = os.path.splitext(fn)[1].lower()
+    if ext not in _TOOL_ICON_EXTS:
+        raise HTTPException(400, "仅支持 png/jpg/jpeg/gif/webp/svg/ico 格式")
+    ts = int(time.time() * 1000)
+    stored_name = f"{ts}{ext}"
+    fp = os.path.join(TOOLS_ICON_DIR, stored_name)
+    with open(fp, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    # icon 字段存储相对 tools 目录的路径，前端用 /api/tool-icon/<icon> 访问
+    icon_path = f"icons/{stored_name}"
+    return {"ok": True, "icon": icon_path}
 
 
 @app.put("/api/admin/tools/{tid}")

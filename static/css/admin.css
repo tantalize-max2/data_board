@@ -253,6 +253,14 @@ body>*{position:relative;z-index:1}
   padding:7px 12px;font-size:13px;color:var(--text-primary);outline:none;font-family:inherit;margin-bottom:8px;transition:all .2s}
 .access-search-box:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-glow)}
 
+/* 工具图标上传 */
+.tool-icon-uploader{display:flex;align-items:center;gap:6px}
+.tool-icon-box{width:56px;height:56px;border:1px dashed var(--border);border-radius:var(--radius);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-input);flex-shrink:0}
+.tool-icon-preview{width:100%;height:100%;object-fit:contain}
+.tool-icon-placeholder{font-size:12px;color:var(--text-dim)}
+.tool-icon-uploading{font-size:11px;color:var(--cyan)}
+
 /* ==================== 响应式（手机适配） ==================== */
 
 /* 平板 */

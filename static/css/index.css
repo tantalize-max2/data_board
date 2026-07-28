@@ -399,7 +399,8 @@ body>*{position:relative;z-index:1}
 .tools-card:hover{background:rgba(255,255,255,.08);border-color:rgba(255,217,128,.35);
   transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .tools-card-icon{width:40px;height:40px;border-radius:8px;background:rgba(255,217,128,.1);
-  display:flex;align-items:center;justify-content:center;color:var(--text-accent);flex-shrink:0}
+  display:flex;align-items:center;justify-content:center;color:var(--text-accent);flex-shrink:0;overflow:hidden}
+.tools-card-icon-img{width:100%;height:100%;object-fit:contain}
 .tools-card-body{flex:1;min-width:0}
 .tools-card-name{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -782,9 +782,15 @@ async function openToolManage(mid,name){
   }catch(e){toast(e.message,'error');}
 }
 
+let _pendingIcon='';  /* 暂存本次表单中已上传/已选择的图标路径 */
 function openLinkToolEdit(tid,mid){
   const isEdit=!!tid;
   const t=isEdit?(TOOLS_LIST_CACHE.find(x=>x.id===tid)||{}):{};
+  _pendingIcon=t.icon||'';
+  const iconPreviewHtml=t.icon
+    ? `<img src="/api/tool-icon/${esc(t.icon)}?token=${encodeURIComponent(TOKEN)}" class="tool-icon-preview" onerror="this.style.display='none'">
+       <button type="button" class="btn btn-sm" onclick="clearToolIcon()">移除</button>`
+    : `<div class="tool-icon-placeholder">无</div>`;
   openModal(isEdit?'编辑工具':'添加工具',
     `<div class="form-grid">
       <div class="form-field"><label>工具名称</label><input id="tt_name" value="${esc(t.name||'')}" placeholder="如：商机分析器"></div>
@@ -793,9 +799,41 @@ function openLinkToolEdit(tid,mid){
       <div class="form-field"><label>打开方式</label>
         <select id="tt_open"><option value="newtab" ${t.open_mode==='newtab'?'selected':''}>新窗口打开</option><option value="iframe" ${t.open_mode==='iframe'?'selected':''}>内嵌预览</option></select>
       </div>
-      <div class="form-field"><label>图标标识（可选）</label><input id="tt_icon" value="${esc(t.icon||'')}" placeholder="如：chart"></div>
+      <div class="form-field full"><label>工具图标（可选，从本地上传）</label>
+        <div class="tool-icon-uploader">
+          <div id="toolIconBox" class="tool-icon-box">${iconPreviewHtml}</div>
+          <label class="btn btn-primary btn-sm" style="cursor:pointer;margin-left:10px">选择图片<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,image/x-icon" style="display:none" onchange="uploadToolIcon(this.files[0])"></label>
+        </div>
+      </div>
+      <input type="hidden" id="tt_icon" value="${esc(t.icon||'')}">
     </div>`,
     `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveLinkTool(${tid},${mid})">${isEdit?'保存':'添加'}</button>`);
+}
+
+async function uploadToolIcon(file){
+  if(!file)return;
+  const fd=new FormData();
+  fd.append('file',file);
+  const box=document.getElementById('toolIconBox');
+  if(box)box.innerHTML='<div class="tool-icon-uploading">上传中...</div>';
+  try{
+    const sep='?token='+encodeURIComponent(TOKEN);
+    const res=await fetch('/api/admin/tools/upload-icon'+sep,{method:'POST',body:fd});
+    if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.detail||'上传失败');}
+    const d=await res.json();
+    _pendingIcon=d.icon;
+    document.getElementById('tt_icon').value=d.icon;
+    if(box)box.innerHTML=`<img src="/api/tool-icon/${esc(d.icon)}?token=${encodeURIComponent(TOKEN)}" class="tool-icon-preview">
+      <button type="button" class="btn btn-sm" onclick="clearToolIcon()">移除</button>`;
+    toast('图标已上传','success');
+  }catch(e){toast(e.message,'error');if(box)box.innerHTML='<div class="tool-icon-placeholder">上传失败</div>';}
+}
+
+function clearToolIcon(){
+  _pendingIcon='';
+  document.getElementById('tt_icon').value='';
+  const box=document.getElementById('toolIconBox');
+  if(box)box.innerHTML='<div class="tool-icon-placeholder">无</div>';
 }
 
 async function saveLinkTool(tid,mid){
@@ -803,7 +841,7 @@ async function saveLinkTool(tid,mid){
   const description=document.getElementById('tt_desc').value.trim();
   const url=document.getElementById('tt_url').value.trim();
   const open_mode=document.getElementById('tt_open').value;
-  const icon=document.getElementById('tt_icon').value.trim();
+  const icon=document.getElementById('tt_icon').value.trim()||_pendingIcon;
   if(!name){toast('名称必填','error');return;}
   /* 判断工具类型：编辑时取缓存，新增时为 link */
   const existTool=tid?(TOOLS_LIST_CACHE.find(x=>x.id===tid)||{}):{};
